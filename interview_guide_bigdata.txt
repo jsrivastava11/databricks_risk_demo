@@ -1,0 +1,3830 @@
+================================================================
+       DATA ENGINEERING INTERVIEW PREP — COMPLETE GUIDE
+       Tailored for 5 YOE | Senior DE Level (15 YOE Depth)
+================================================================
+
+CURRICULUM OVERVIEW
+-------------------
+SECTION 1  : Core Fundamentals
+SECTION 2  : SQL & Query Optimization
+SECTION 3  : Data Modeling
+SECTION 4  : Distributed Systems & Big Data
+SECTION 5  : ETL / ELT Pipelines
+SECTION 6  : Data Warehousing
+SECTION 7  : Data Lakes & Lakehouses
+SECTION 8  : Streaming & Real-Time Processing
+SECTION 9  : Cloud Platforms (AWS / Azure / GCP)
+SECTION 10 : Orchestration & Workflow Management
+SECTION 11 : Data Quality & Governance
+SECTION 12 : Performance Tuning & Optimization
+SECTION 13 : System Design for Data Engineering
+SECTION 14 : Python for Data Engineering
+SECTION 15 : Behavioral & Scenario Questions
+
+================================================================
+SECTION 1: CORE FUNDAMENTALS
+================================================================
+
+1.1 TYPES OF DATA
+-----------------
+Structured Data   : Rows & columns, fixed schema (RDBMS tables, CSV)
+Semi-structured   : Schema embedded in data (JSON, XML, Avro, Parquet)
+Unstructured Data : No predefined schema (images, videos, logs, PDFs)
+
+WHY IT MATTERS IN INTERVIEWS:
+- Interviewers test if you can choose the right storage & processing
+  for each data type.
+
+------------------------------------------------------------------
+
+1.2 DATABASE TYPES
+------------------
+OLTP (Online Transaction Processing)
+  - Optimized for high-speed reads/writes of small transactions
+  - Row-oriented storage
+  - Examples: MySQL, PostgreSQL, Oracle, SQL Server
+  - Use case: Banking transactions, e-commerce orders
+
+OLAP (Online Analytical Processing)
+  - Optimized for complex queries over large datasets
+  - Column-oriented storage
+  - Examples: Redshift, BigQuery, Snowflake, ClickHouse
+  - Use case: Business intelligence, reporting, aggregations
+
+KEY DIFFERENCE:
+  OLTP  → Many small, fast transactions (INSERT/UPDATE/DELETE heavy)
+  OLAP  → Few large, slow queries (SELECT/aggregate heavy)
+
+NOSQL Databases
+  - Key-Value    : Redis, DynamoDB    → Sessions, caching
+  - Document     : MongoDB, Firestore → Flexible JSON documents
+  - Column-family: Cassandra, HBase   → High write throughput
+  - Graph        : Neo4j              → Relationship-heavy data
+  - Time-series  : InfluxDB           → Metrics, IoT, monitoring
+
+------------------------------------------------------------------
+
+1.3 STORAGE FORMATS
+-------------------
+CSV
+  - Human-readable, row-based
+  - No compression, no schema enforcement
+  - Bad for big data (slow to read, large size)
+
+JSON / JSONL
+  - Semi-structured, flexible schema
+  - JSONL (newline-delimited) great for streaming/logs
+
+Parquet
+  - Columnar storage format
+  - Excellent compression (Snappy, Gzip, Zstd)
+  - Schema embedded, supports nested types
+  - BEST for analytical workloads — reads only needed columns
+  - Used in: Spark, Hive, Athena, BigQuery, Databricks
+
+ORC (Optimized Row Columnar)
+  - Similar to Parquet, more common in Hive ecosystem
+  - Better compression than Parquet in some cases
+
+Avro
+  - Row-based, binary format
+  - Schema stored separately in schema registry
+  - BEST for streaming / Kafka (schema evolution support)
+  - Great for write-heavy workloads
+
+Delta Lake Format
+  - Parquet + transaction log (JSON)
+  - ACID transactions on data lakes
+  - Supports time travel, schema enforcement, CDC
+
+QUICK COMPARISON:
+  Format   | Storage | Best For          | Schema Evolution
+  ---------|---------|-------------------|------------------
+  CSV      | Row     | Small files, debug | No
+  JSON     | Row     | Logs, APIs         | Yes (flexible)
+  Parquet  | Column  | Analytics, Spark   | Limited
+  Avro     | Row     | Kafka, streaming   | Excellent
+  ORC      | Column  | Hive workloads     | Limited
+  Delta    | Column  | Lakehouse, ACID    | Excellent
+
+------------------------------------------------------------------
+
+1.4 BATCH vs STREAMING
+-----------------------
+Batch Processing
+  - Process data in chunks at scheduled intervals
+  - High latency (minutes to hours)
+  - High throughput, efficient for large datasets
+  - Tools: Spark, Hive, dbt, Hadoop MapReduce
+  - Use case: Daily sales report, monthly billing
+
+Streaming Processing
+  - Process data continuously as it arrives
+  - Low latency (milliseconds to seconds)
+  - Tools: Kafka Streams, Spark Streaming, Flink, Kinesis
+  - Use case: Fraud detection, real-time dashboards, IoT alerts
+
+Lambda Architecture
+  - Batch layer  : Accurate, slow (processes all historical data)
+  - Speed layer  : Fast, approximate (processes recent data)
+  - Serving layer: Merges both for queries
+  - Problem: Maintaining two codebases
+
+Kappa Architecture
+  - Single streaming layer for everything
+  - Replay from Kafka for re-processing historical data
+  - Simpler than Lambda, increasingly preferred
+
+------------------------------------------------------------------
+
+1.5 CAP THEOREM (Critical for Distributed Systems)
+----------------------------------------------------
+In a distributed system, you can only guarantee 2 of 3:
+
+C — Consistency    : Every read gets the most recent write
+A — Availability   : Every request gets a response (not guaranteed fresh)
+P — Partition Tol. : System works even if network splits occur
+
+Real-world choices:
+  CP (Consistency + Partition): HBase, Zookeeper → Banking
+  AP (Availability + Partition): Cassandra, DynamoDB → Social feeds
+  CA (Consistency + Availability): Traditional RDBMS → No partition tolerance
+
+Interviewers love: "How do you handle consistency in distributed pipelines?"
+
+------------------------------------------------------------------
+
+1.6 ACID vs BASE
+-----------------
+ACID (Relational DBs, Delta Lake)
+  A — Atomicity   : All or nothing (transaction commits or fully rolls back)
+  C — Consistency : Data always moves from valid state to valid state
+  I — Isolation   : Concurrent transactions don't interfere
+  D — Durability  : Committed data persists even after crash
+
+BASE (NoSQL)
+  BA — Basically Available : System is always available
+  S  — Soft state          : Data may change over time without input
+  E  — Eventually consistent: Will become consistent eventually
+
+================================================================
+NEXT: SECTION 2 — SQL & QUERY OPTIMIZATION
+(Run when ready with: "next" or "continue")
+================================================================
+
+================================================================
+SECTION 2: SQL & QUERY OPTIMIZATION
+================================================================
+
+2.1 SQL EXECUTION ORDER (Most Misunderstood Concept)
+-----------------------------------------------------
+SQL is WRITTEN in this order:
+  SELECT → FROM → JOIN → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+
+But EXECUTED in this order:
+  1. FROM
+  2. JOIN
+  3. WHERE        ← filters rows BEFORE grouping
+  4. GROUP BY
+  5. HAVING       ← filters AFTER grouping (on aggregates)
+  6. SELECT
+  7. DISTINCT
+  8. ORDER BY
+  9. LIMIT
+
+WHY IT MATTERS:
+  - You CANNOT use a SELECT alias in a WHERE clause (not yet evaluated)
+  - HAVING filters aggregates; WHERE cannot filter aggregates
+  - Always filter early (WHERE before GROUP BY) to reduce data scanned
+
+EXAMPLE:
+  -- Wrong: alias used in WHERE
+  SELECT salary * 1.1 AS new_salary FROM emp WHERE new_salary > 50000;
+
+  -- Right:
+  SELECT salary * 1.1 AS new_salary FROM emp WHERE salary * 1.1 > 50000;
+
+------------------------------------------------------------------
+
+2.2 WINDOW FUNCTIONS (Heavy Interview Topic)
+--------------------------------------------
+Window functions perform calculations ACROSS rows related to current row
+WITHOUT collapsing rows (unlike GROUP BY).
+
+Syntax:
+  function() OVER (PARTITION BY col ORDER BY col ROWS/RANGE frame)
+
+RANKING FUNCTIONS:
+  ROW_NUMBER()  → Unique sequential number, no ties (1,2,3,4)
+  RANK()        → Ties get same rank, gaps after tie (1,1,3,4)
+  DENSE_RANK()  → Ties get same rank, NO gaps (1,1,2,3)
+  NTILE(n)      → Divide rows into n equal buckets
+
+AGGREGATE AS WINDOW:
+  SUM()   OVER (PARTITION BY dept ORDER BY date) → Running total
+  AVG()   OVER (PARTITION BY dept)               → Dept average per row
+  COUNT() OVER ()                                → Total rows in result
+
+LAG / LEAD:
+  LAG(col, n)  → Value from n rows BEFORE current row
+  LEAD(col, n) → Value from n rows AFTER current row
+  Use case: Compare today's sales vs yesterday's
+
+FIRST_VALUE / LAST_VALUE:
+  FIRST_VALUE(col) OVER (PARTITION BY dept ORDER BY salary DESC)
+  → Highest salary in dept shown on every row of that dept
+
+FRAME CLAUSE:
+  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW → Running total
+  ROWS BETWEEN 6 PRECEDING AND CURRENT ROW         → Rolling 7-day avg
+  ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING → Suffix sum
+
+EXAMPLE — Running total + Rank per department:
+  SELECT
+    emp_id, dept, salary,
+    SUM(salary) OVER (PARTITION BY dept ORDER BY hire_date) AS running_total,
+    RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS salary_rank
+  FROM employees;
+
+------------------------------------------------------------------
+
+2.3 JOINS — Deep Dive
+----------------------
+INNER JOIN   : Only matching rows from both tables
+LEFT JOIN    : All rows from left + matching from right (NULL if no match)
+RIGHT JOIN   : All rows from right + matching from left
+FULL OUTER   : All rows from both, NULLs where no match
+CROSS JOIN   : Cartesian product (every row x every row) — use carefully
+SELF JOIN    : Table joined to itself (org hierarchy, friend networks)
+
+ANTI JOIN (Important for DE):
+  -- Find rows in A with NO match in B
+  SELECT a.* FROM a LEFT JOIN b ON a.id = b.id WHERE b.id IS NULL
+
+SEMI JOIN:
+  -- Check existence, don't return b columns
+  SELECT * FROM a WHERE EXISTS (SELECT 1 FROM b WHERE b.id = a.id)
+
+JOIN PERFORMANCE TIPS:
+  - Join on indexed columns
+  - Filter (WHERE) before joining when possible
+  - Avoid functions on join keys (prevents index use)
+  - In distributed systems (Spark): prefer broadcast join for small tables
+
+------------------------------------------------------------------
+
+2.4 INDEXING
+-------------
+What is an Index?
+  A data structure (B-tree by default) that speeds up reads at the cost
+  of write overhead and storage.
+
+Types:
+  B-tree Index    : Default, good for =, <, >, BETWEEN, LIKE 'prefix%'
+  Hash Index      : Only equality (=), faster than B-tree for exact match
+  Bitmap Index    : Low-cardinality columns (gender, status) — OLAP only
+  Composite Index : Index on multiple columns — ORDER of columns matters!
+  Covering Index  : Index contains all columns needed by query (no table lookup)
+  Partial Index   : Index on subset of rows (WHERE active = true)
+
+COMPOSITE INDEX RULE — Leftmost Prefix:
+  Index on (a, b, c) helps queries filtering on:
+    a         → YES
+    a, b      → YES
+    a, b, c   → YES
+    b, c      → NO (a must be first)
+    a, c      → Partial (only a part used)
+
+WHEN NOT TO INDEX:
+  - Small tables (full scan is faster)
+  - Columns with very low cardinality (boolean — bitmap index instead)
+  - Heavily written tables (index slows INSERT/UPDATE/DELETE)
+
+------------------------------------------------------------------
+
+2.5 QUERY OPTIMIZATION TECHNIQUES
+-----------------------------------
+1. Use EXPLAIN / EXPLAIN ANALYZE to read query execution plan
+2. Filter early — push WHERE conditions as close to source as possible
+3. Avoid SELECT * — fetch only needed columns (especially columnar stores)
+4. Avoid functions on indexed columns in WHERE:
+     BAD : WHERE YEAR(created_at) = 2024
+     GOOD: WHERE created_at BETWEEN '2024-01-01' AND '2024-12-31'
+5. Use EXISTS instead of IN for large subqueries
+6. Partition large tables and filter on partition key
+7. Use CTEs for readability but be aware: some DBs materialize CTEs
+8. Avoid correlated subqueries (re-execute for every row) → use JOIN
+9. Use appropriate JOIN type — don't use LEFT JOIN when INNER suffices
+10. Batch large writes / use bulk insert instead of row-by-row
+
+------------------------------------------------------------------
+
+2.6 COMMON INTERVIEW SQL PATTERNS
+-----------------------------------
+
+DEDUPLICATE (keep latest record per key):
+  SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC) rn
+    FROM orders
+  ) WHERE rn = 1;
+
+TOP N PER GROUP:
+  SELECT * FROM (
+    SELECT *, RANK() OVER (PARTITION BY dept ORDER BY salary DESC) rnk
+    FROM employees
+  ) WHERE rnk <= 3;
+
+RUNNING TOTAL:
+  SELECT date, amount,
+    SUM(amount) OVER (ORDER BY date) AS cumulative
+  FROM sales;
+
+MONTH-OVER-MONTH CHANGE:
+  SELECT month, revenue,
+    LAG(revenue) OVER (ORDER BY month) AS prev_month,
+    revenue - LAG(revenue) OVER (ORDER BY month) AS change
+  FROM monthly_sales;
+
+FIND GAPS IN SEQUENCE:
+  SELECT id + 1 AS gap_start
+  FROM t
+  WHERE id + 1 NOT IN (SELECT id FROM t);
+
+PIVOT (manual):
+  SELECT
+    dept,
+    SUM(CASE WHEN gender = 'M' THEN salary END) AS male_sal,
+    SUM(CASE WHEN gender = 'F' THEN salary END) AS female_sal
+  FROM employees
+  GROUP BY dept;
+
+------------------------------------------------------------------
+
+2.7 NULL HANDLING
+------------------
+  NULL = unknown. NULL != NULL (NULL comparisons always return UNKNOWN)
+
+  IS NULL / IS NOT NULL  → correct way to check
+  COALESCE(a, b, c)      → returns first non-NULL value
+  NULLIF(a, b)           → returns NULL if a = b, else a
+  NVL(a, b)              → Oracle equivalent of COALESCE(a, b)
+
+  Aggregates IGNORE NULLs (COUNT(*) counts all rows, COUNT(col) skips NULLs)
+  ORDER BY: NULLs sort LAST by default in most DBs (NULLS LAST / NULLS FIRST)
+
+================================================================
+NEXT: SECTION 3 — DATA MODELING
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 3: DATA MODELING
+================================================================
+
+3.1 WHY DATA MODELING MATTERS
+-------------------------------
+Data modeling is the blueprint of how data is structured, stored,
+and accessed. A bad model causes:
+  - Slow queries
+  - Data duplication / inconsistency
+  - Painful schema changes later
+  - Poor BI/reporting performance
+
+------------------------------------------------------------------
+
+3.2 NORMALIZATION
+------------------
+Process of organizing data to reduce redundancy and improve integrity.
+
+1NF (First Normal Form):
+  - Each column holds atomic (indivisible) values
+  - No repeating groups or arrays in a column
+  BAD : | id | phones         |  → | 1 | 555-1234, 555-5678 |
+  GOOD: Separate rows per phone number
+
+2NF (Second Normal Form):
+  - Must be in 1NF
+  - Every non-key column depends on the WHOLE primary key (no partial deps)
+  - Relevant when composite primary key exists
+  BAD : order_items(order_id, product_id, product_name)
+        product_name depends only on product_id, not full key
+
+3NF (Third Normal Form):
+  - Must be in 2NF
+  - No transitive dependencies (non-key col depending on another non-key col)
+  BAD : employee(emp_id, dept_id, dept_name)
+        dept_name depends on dept_id, not emp_id → move to dept table
+
+BCNF (Boyce-Codd Normal Form):
+  - Stricter version of 3NF
+  - Every determinant must be a candidate key
+
+DENORMALIZATION:
+  - Intentionally introducing redundancy for READ performance
+  - Common in OLAP/data warehouses
+  - Trade-off: faster reads, slower writes, data duplication risk
+
+RULE OF THUMB:
+  OLTP → Normalize (3NF) for data integrity
+  OLAP → Denormalize for query performance
+
+------------------------------------------------------------------
+
+3.3 DIMENSIONAL MODELING (Kimball Methodology)
+------------------------------------------------
+The gold standard for data warehousing. Designed for analytical queries.
+
+Two types of tables:
+  FACT TABLE    : Stores measurable, numeric business events
+                  (sales, clicks, transactions)
+  DIMENSION TABLE: Stores descriptive context about facts
+                  (who, what, where, when, why)
+
+FACT TABLE characteristics:
+  - Contains foreign keys to all dimension tables
+  - Contains measures/metrics (revenue, quantity, duration)
+  - Very large (millions to billions of rows)
+  - Narrow inserts, append-mostly
+
+DIMENSION TABLE characteristics:
+  - Contains descriptive attributes
+  - Relatively small
+  - Denormalized (for query simplicity)
+  - Contains surrogate keys (system-generated IDs)
+
+------------------------------------------------------------------
+
+3.4 STAR SCHEMA
+----------------
+Fact table in the center, dimension tables directly connected.
+
+         [DimDate]
+             |
+[DimProduct]--[FactSales]--[DimCustomer]
+             |
+         [DimStore]
+
+PROS:
+  - Simple, easy to understand
+  - Fast query performance (fewer joins)
+  - Better for BI tools
+
+CONS:
+  - Data redundancy in dimension tables
+  - Harder to maintain if dimensions change frequently
+
+------------------------------------------------------------------
+
+3.5 SNOWFLAKE SCHEMA
+---------------------
+Dimension tables are normalized — sub-dimensions split out.
+
+[DimProduct] → [DimCategory] → [DimDepartment]
+
+PROS:
+  - Less storage (less redundancy)
+  - Easier to maintain dimension hierarchies
+
+CONS:
+  - More joins = slower queries
+  - More complex for BI tools
+
+INTERVIEW ANSWER: "In practice, star schema is preferred for analytics
+because query simplicity and speed outweigh storage savings."
+
+------------------------------------------------------------------
+
+3.6 SLOWLY CHANGING DIMENSIONS (SCD) — Critical Interview Topic
+----------------------------------------------------------------
+How do you handle changes in dimension data over time?
+(e.g., customer moves city, employee changes department)
+
+SCD TYPE 0 — No change (retain original value forever)
+  Use: Date of birth, original signup channel
+
+SCD TYPE 1 — Overwrite
+  - Simply update the record, no history kept
+  - Simple but loses historical accuracy
+  Use: Fixing data errors, typos
+  BAD for: When history matters
+
+SCD TYPE 2 — Add New Row (Most Common in Interviews)
+  - Insert a new row for each change
+  - Track with: effective_date, expiry_date, is_current flag
+  - Use surrogate key (not natural key) as primary key
+  Example:
+    | surr_key | cust_id | city    | eff_date   | exp_date   | is_current |
+    |----------|---------|---------|------------|------------|------------|
+    | 1        | 101     | Mumbai  | 2020-01-01 | 2023-05-31 | N          |
+    | 2        | 101     | Delhi   | 2023-06-01 | 9999-12-31 | Y          |
+
+  Use: Customer address, employee department, product category
+
+SCD TYPE 3 — Add New Column
+  - Add a "previous value" column alongside current value
+  - Only tracks ONE prior change
+  Example:
+    | cust_id | current_city | prev_city |
+    |---------|--------------|-----------|
+    | 101     | Delhi        | Mumbai    |
+  Use: When only previous state matters, not full history
+
+SCD TYPE 4 — History Table
+  - Separate history table tracks all changes
+  - Main table always has current record
+  Use: When history table needs different access patterns
+
+SCD TYPE 6 — Hybrid (Type 1 + 2 + 3)
+  - Combines overwrite + new row + previous column
+  - Most flexible, most complex
+
+INTERVIEW TIP: Always ask "Do we need historical accuracy?"
+  YES → SCD Type 2
+  NO  → SCD Type 1
+
+------------------------------------------------------------------
+
+3.7 FACT TABLE TYPES
+---------------------
+Transaction Fact Table (Most Common)
+  - One row per transaction/event
+  - Finest granularity
+  - Example: one row per order line item
+
+Snapshot Fact Table
+  - Captures state at a point in time (daily/monthly snapshot)
+  - Example: account balance at end of each day
+  - Great for tracking slow-moving metrics
+
+Accumulating Snapshot Fact Table
+  - One row per business process instance, updated as it progresses
+  - Example: order lifecycle (placed → shipped → delivered)
+  - Contains multiple date foreign keys for each milestone
+
+Factless Fact Table
+  - No numeric measures, just foreign keys
+  - Captures the occurrence of an event
+  - Example: student attendance, product promotion coverage
+
+------------------------------------------------------------------
+
+3.8 SURROGATE KEYS vs NATURAL KEYS
+------------------------------------
+Natural Key   : Business identifier (SSN, email, order_number)
+Surrogate Key : System-generated integer/UUID (no business meaning)
+
+WHY SURROGATE KEYS in DWH:
+  - Source system keys can change or be reused
+  - Enables SCD Type 2 (multiple rows for same entity)
+  - Faster joins (integer vs string comparison)
+  - Decouples DWH from source system changes
+
+------------------------------------------------------------------
+
+3.9 DATA VAULT MODELING (Advanced)
+------------------------------------
+Designed for enterprise DWH with many source systems.
+Three components:
+  HUB     : Business keys (unique identifiers)
+  LINK    : Relationships between hubs
+  SATELLITE: Descriptive attributes with history
+
+PROS:
+  - Highly scalable, easy to add new sources
+  - Full auditability and history
+  - Parallel loading
+
+CONS:
+  - Complex, many tables
+  - Slower queries (needs transformation layer on top)
+
+When to use: Large enterprise, many source systems, strict audit needs
+When NOT to use: Small teams, simple reporting needs
+
+------------------------------------------------------------------
+
+3.10 COMMON MODELING INTERVIEW QUESTIONS
+-----------------------------------------
+Q: "Design a data model for an e-commerce platform."
+A: Identify facts (orders, clicks, payments) and dimensions
+   (customer, product, date, location), then model as star schema.
+   Discuss SCD Type 2 for customer/product changes.
+
+Q: "What's the grain of your fact table?"
+A: Grain = the most atomic level of detail (one row = one what?)
+   Always define grain FIRST before modeling. Mixing grains = bad.
+
+Q: "How do you handle late-arriving data?"
+A: In SCD2: check if row fits between effective/expiry dates.
+   In snapshots: backfill or flag as late.
+   In streaming: use watermarks (event time vs processing time).
+
+Q: "Star vs Snowflake — which do you prefer?"
+A: Star schema for analytics — fewer joins, better performance,
+   easier for BI tools. Snowflake only if storage is a major concern
+   or dimension hierarchies are complex and frequently queried alone.
+
+================================================================
+NEXT: SECTION 4 — DISTRIBUTED SYSTEMS & BIG DATA
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 4: DISTRIBUTED SYSTEMS & BIG DATA
+================================================================
+
+4.1 WHY DISTRIBUTED SYSTEMS?
+------------------------------
+Single machine limits: one CPU, one disk, one network card.
+When data > RAM or compute > one machine → distribute the work.
+
+Key goals:
+  - Scalability  : Handle more data by adding machines (horizontal scale)
+  - Fault Tolerance: Continue working when nodes fail
+  - Performance  : Parallel processing = faster results
+
+------------------------------------------------------------------
+
+4.2 HADOOP ECOSYSTEM (Foundation — Still Asked)
+-------------------------------------------------
+HDFS (Hadoop Distributed File System)
+  - Stores large files across many machines
+  - Files split into blocks (default 128MB)
+  - Each block replicated 3x (fault tolerance)
+  - NameNode: metadata master (which block is where)
+  - DataNode : actual data storage
+
+MapReduce
+  - Original Hadoop compute engine
+  - MAP phase   : Transform input → key-value pairs (parallel)
+  - SHUFFLE phase: Group all same keys together (expensive — network I/O)
+  - REDUCE phase : Aggregate values per key
+  - Slow: writes intermediate results to disk between phases
+  - Largely replaced by Spark
+
+YARN (Yet Another Resource Negotiator)
+  - Cluster resource manager for Hadoop
+  - ResourceManager: Allocates cluster resources
+  - NodeManager   : Manages resources on each node
+  - ApplicationMaster: Manages lifecycle of each app
+
+HIVE
+  - SQL interface on top of HDFS/Hadoop
+  - Converts SQL to MapReduce/Tez/Spark jobs
+  - Schema-on-read: apply schema when reading, not writing
+  - Good for: batch SQL on large datasets
+  - Bad for: low-latency queries
+
+------------------------------------------------------------------
+
+4.3 APACHE SPARK — THE CORE ENGINE (Must Know Deep)
+-----------------------------------------------------
+Spark is an in-memory distributed compute engine.
+  - 100x faster than MapReduce (in-memory vs disk)
+  - Unified: batch, streaming, ML, graph in one engine
+  - Written in Scala, APIs in Python (PySpark), Java, R, SQL
+
+SPARK ARCHITECTURE:
+  Driver Program
+    - Your application code
+    - Creates SparkContext / SparkSession
+    - Plans the execution (DAG)
+    - Coordinates the job
+
+  Cluster Manager (YARN / Kubernetes / Standalone / Mesos)
+    - Allocates resources across cluster
+
+  Executor
+    - Worker process on each node
+    - Runs tasks and stores data in memory/disk
+    - Each executor has multiple cores (tasks run in parallel)
+
+  Task
+    - Smallest unit of work
+    - One task = one partition of data
+
+  DAG (Directed Acyclic Graph)
+    - Spark builds a graph of all transformations
+    - Optimized by Catalyst optimizer before execution
+
+------------------------------------------------------------------
+
+4.4 RDD vs DataFrame vs Dataset
+---------------------------------
+RDD (Resilient Distributed Dataset) — Low Level
+  - Original Spark abstraction
+  - Immutable, distributed collection of objects
+  - No schema, no optimization
+  - Use when: custom partitioning, low-level control needed
+
+DataFrame — High Level (Use This)
+  - Distributed table with named columns and schema
+  - Optimized by Catalyst + Tungsten
+  - Python/R/SQL friendly
+  - 10-100x faster than RDD for most operations
+
+Dataset — Typed DataFrame (Scala/Java only)
+  - Compile-time type safety
+  - Not available in Python
+
+RULE: Always use DataFrame/SQL in PySpark. RDD only if unavoidable.
+
+------------------------------------------------------------------
+
+4.5 TRANSFORMATIONS vs ACTIONS — Critical Concept
+---------------------------------------------------
+TRANSFORMATIONS (Lazy — don't execute immediately)
+  - Build the DAG but don't run
+  - Examples: filter(), select(), groupBy(), join(), withColumn()
+
+ACTIONS (Trigger execution)
+  - Force Spark to execute the DAG
+  - Examples: show(), count(), collect(), write(), take()
+
+WHY LAZY EVALUATION?
+  - Spark can optimize the entire plan before running
+  - Avoids unnecessary computation
+  - Allows pipelining of operations
+
+NARROW vs WIDE TRANSFORMATIONS:
+  Narrow: Each input partition → one output partition (no shuffle)
+    Examples: filter, select, map, union
+    Fast — no network transfer
+
+  Wide: Input partitions → multiple output partitions (SHUFFLE)
+    Examples: groupBy, join, distinct, repartition
+    Slow — requires network transfer between executors
+
+------------------------------------------------------------------
+
+4.6 SHUFFLES — THE MOST EXPENSIVE OPERATION
+---------------------------------------------
+A shuffle happens when Spark needs to redistribute data across partitions
+(e.g., groupBy, join, distinct).
+
+What happens during a shuffle:
+  1. Map side: write intermediate data to disk
+  2. Network transfer: send data to correct executor
+  3. Reduce side: sort and merge received data
+
+WHY SHUFFLES ARE EXPENSIVE:
+  - Disk I/O (write + read)
+  - Network I/O (data transfer)
+  - Memory pressure
+
+HOW TO REDUCE SHUFFLES:
+  1. Filter data BEFORE joins/groupBy (reduce data size)
+  2. Use broadcast join for small tables (< ~10MB default)
+     spark.sql.autoBroadcastJoinThreshold = 10MB
+  3. Partition data on join/group key beforehand
+  4. Use reduceByKey instead of groupByKey (pre-aggregate on map side)
+  5. Persist/cache intermediate results reused multiple times
+
+------------------------------------------------------------------
+
+4.7 PARTITIONING IN SPARK
+---------------------------
+Partition = unit of parallelism. 1 partition = 1 task = 1 core.
+
+Too few partitions  → underutilization, out-of-memory
+Too many partitions → overhead, tiny tasks, scheduling cost
+
+RULE OF THUMB:
+  - 2-4 partitions per CPU core
+  - Target 100-200MB per partition
+  - Default: spark.sql.shuffle.partitions = 200 (often too high or low)
+
+repartition(n)
+  - Full shuffle, creates exactly n balanced partitions
+  - Use when: increasing partitions or balancing skewed data
+
+coalesce(n)
+  - Reduces partitions WITHOUT full shuffle (merge local partitions)
+  - Use when: reducing partitions before write (avoid small files)
+  - Cannot increase partition count
+
+PARTITION PRUNING:
+  - If data is partitioned on disk by date, and query filters by date,
+    Spark reads ONLY matching partitions → massive I/O savings
+  - Always partition large tables on frequently filtered columns
+
+DATA SKEW:
+  - One partition has much more data than others
+  - Causes: popular keys (e.g., NULL, top customer)
+  - Symptoms: one task takes 100x longer than others
+  - Fixes:
+      Salting: add random suffix to skewed keys, then aggregate
+      Broadcast join: if one side is small
+      AQE (Adaptive Query Execution): auto-splits skewed partitions
+
+------------------------------------------------------------------
+
+4.8 CACHING & PERSISTENCE
+---------------------------
+cache()     → MEMORY_AND_DISK (default)
+persist()   → Choose storage level:
+  MEMORY_ONLY         : Fastest, fails if not enough RAM
+  MEMORY_AND_DISK     : Falls back to disk if RAM full
+  DISK_ONLY           : Always disk (slower, reliable)
+  MEMORY_ONLY_SER     : Serialized (smaller, slower to deserialize)
+
+WHEN TO CACHE:
+  - DataFrame used multiple times in same job
+  - Iterative algorithms (ML training loops)
+  - After expensive transformations (joins, aggregations)
+
+WHEN NOT TO CACHE:
+  - Used only once
+  - Data too large (evicts other cached data → worse performance)
+  - Simple scans (fast enough without cache)
+
+unpersist() → Always release cache when done
+
+------------------------------------------------------------------
+
+4.9 SPARK JOINS IN DETAIL
+---------------------------
+Broadcast Hash Join (Best for small + large table)
+  - Small table broadcast to ALL executors
+  - No shuffle needed
+  - Threshold: spark.sql.autoBroadcastJoinThreshold (default 10MB)
+
+Sort Merge Join (Default for large + large)
+  - Both tables sorted on join key, then merged
+  - Requires shuffle (expensive but scales well)
+  - Best when both tables are large
+
+Shuffle Hash Join
+  - Hash table built from smaller side
+  - Requires shuffle, uses memory
+  - Used when smaller side fits in memory but too big to broadcast
+
+Cartesian Join
+  - CROSS JOIN, no join condition
+  - Extremely expensive O(n*m)
+  - Only use intentionally
+
+------------------------------------------------------------------
+
+4.10 SPARK OPTIMIZATION CHECKLIST
+-----------------------------------
+  [ ] Filter and select early (pushdown predicates)
+  [ ] Use broadcast join for small dimensions
+  [ ] Tune spark.sql.shuffle.partitions for your data size
+  [ ] Avoid collect() on large DataFrames (brings to driver)
+  [ ] Use AQE (Adaptive Query Execution) — enabled by default in Spark 3
+  [ ] Write output as Parquet with appropriate partitioning
+  [ ] Avoid UDFs where possible (breaks Catalyst optimization)
+  [ ] Use native Spark functions (pyspark.sql.functions) over Python UDFs
+  [ ] Cache only what's reused; unpersist when done
+  [ ] Check for data skew in groupBy/join keys
+
+------------------------------------------------------------------
+
+4.11 COMMON INTERVIEW QUESTIONS — DISTRIBUTED SYSTEMS
+------------------------------------------------------
+Q: "What happens when you call groupBy in Spark?"
+A: Wide transformation → triggers shuffle. Data redistributed so all
+   rows with same key land on same partition. Catalyst optimizes the plan.
+
+Q: "How do you handle a skewed join?"
+A: Identify skew with .explain() or Spark UI. Fix with:
+   - Broadcast join if small side
+   - Salting the skewed key
+   - Enable AQE (spark.sql.adaptive.enabled=true)
+
+Q: "What is the difference between repartition and coalesce?"
+A: repartition = full shuffle, can increase/decrease partitions, balanced.
+   coalesce = no full shuffle, only decrease, may be unbalanced.
+   Use coalesce before writes to avoid small files.
+
+Q: "Why is Spark faster than MapReduce?"
+A: In-memory processing vs disk I/O between stages.
+   DAG optimization vs rigid Map → Shuffle → Reduce.
+   Pipelining of narrow transformations.
+
+Q: "What is AQE?"
+A: Adaptive Query Execution (Spark 3+). Re-optimizes query plan at
+   runtime based on actual data statistics (not estimates).
+   Handles: skew join optimization, dynamic coalescing of shuffle
+   partitions, switching join strategies at runtime.
+
+================================================================
+NEXT: SECTION 5 — ETL / ELT PIPELINES
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 5: ETL / ELT PIPELINES
+================================================================
+
+5.1 ETL vs ELT
+---------------
+ETL (Extract → Transform → Load)
+  - Transform data BEFORE loading into destination
+  - Traditional approach (pre-cloud)
+  - Transform happens on dedicated ETL server
+  - Use when: destination has limited compute, strict data rules
+  - Tools: Informatica, SSIS, Talend, Pentaho
+
+ELT (Extract → Load → Transform)
+  - Load raw data first, transform INSIDE destination
+  - Modern cloud approach
+  - Leverages powerful cloud DWH compute (BigQuery, Snowflake, Redshift)
+  - Use when: destination has massive compute, need raw data preserved
+  - Tools: dbt, Spark, Databricks, Fivetran + dbt
+
+WHY ELT WON:
+  - Cloud DWHs have virtually unlimited compute
+  - Raw data preserved → reprocess anytime with new logic
+  - Faster time to load (skip transform bottleneck)
+  - Separation of concerns: ingestion team loads, analytics team transforms
+
+------------------------------------------------------------------
+
+5.2 PIPELINE DESIGN PATTERNS
+------------------------------
+Medallion Architecture (Bronze → Silver → Gold)
+  BRONZE (Raw Layer)
+    - Exact copy of source data, no transformation
+    - Append-only, immutable
+    - Purpose: audit trail, reprocessing capability
+    - Format: JSON, CSV, or raw Parquet
+
+  SILVER (Cleansed Layer)
+    - Cleaned, deduplicated, standardized
+    - Schema enforced, data types cast
+    - Joins across sources may happen here
+    - Format: Delta / Parquet
+
+  GOLD (Business Layer)
+    - Aggregated, business-ready data
+    - Star schema / dimensional models
+    - Direct source for BI tools and dashboards
+    - Format: Delta / Parquet
+
+WHY IT MATTERS:
+  - Clear separation of concerns
+  - Any layer can be reprocessed from the layer below
+  - Debugging is easy — trace issue to which layer introduced it
+
+------------------------------------------------------------------
+
+5.3 INCREMENTAL LOADING PATTERNS
+----------------------------------
+Full Load
+  - Reload entire dataset every run
+  - Simple but expensive for large tables
+  - Use when: table is small, no reliable change tracking
+
+Incremental Load (Append)
+  - Load only NEW records since last run
+  - Track via: max(load_timestamp) or watermark
+  - Use when: append-only sources (events, logs)
+
+Incremental Load (Upsert / Merge)
+  - Load new + updated records
+  - Use MERGE/UPSERT to insert new, update changed rows
+  - Track via: updated_at timestamp or CDC
+  - Use when: source has updates (CRM, transactional DB)
+
+UPSERT PATTERN (Delta Lake / SQL):
+  MERGE INTO target t
+  USING source s ON t.id = s.id
+  WHEN MATCHED THEN UPDATE SET *
+  WHEN NOT MATCHED THEN INSERT *
+
+Partition-based Incremental
+  - Overwrite only the affected partition (e.g., today's date partition)
+  - Idempotent — safe to rerun
+  - Use when: data partitioned by date, corrections possible
+
+------------------------------------------------------------------
+
+5.4 CDC — CHANGE DATA CAPTURE (Very Important)
+------------------------------------------------
+What is CDC?
+  Capturing every INSERT, UPDATE, DELETE from a source database
+  in real-time or near-real-time.
+
+Why CDC?
+  - Full loads are too slow for large tables
+  - Keeps DWH in sync with source without full reload
+  - Enables real-time pipelines
+
+CDC Methods:
+
+  LOG-BASED CDC (Best)
+    - Reads database transaction log (binlog, WAL, redo log)
+    - Zero impact on source database (just reads the log)
+    - Captures every change including DELETEs
+    - Tools: Debezium, AWS DMS, Oracle GoldenGate
+    - Sources: MySQL binlog, PostgreSQL WAL, SQL Server CDC
+
+  TIMESTAMP-BASED CDC
+    - Query: WHERE updated_at > last_run_timestamp
+    - Simple, no extra tooling needed
+    - Misses hard DELETEs (no updated_at on deleted row)
+    - Risk: clock skew, late-arriving updates
+
+  TRIGGER-BASED CDC
+    - DB triggers write changes to audit table
+    - High write overhead on source
+    - Not recommended for high-volume tables
+
+  QUERY DIFF (Last Resort)
+    - Compare current snapshot to previous
+    - Very expensive, only for small tables
+
+DEBEZIUM PATTERN (Log-based CDC):
+  Source DB → Debezium → Kafka Topic → Spark/Flink → Delta Lake
+  Each Kafka message contains: before, after, op (c/u/d), timestamp
+
+------------------------------------------------------------------
+
+5.5 IDEMPOTENCY — Critical for Production Pipelines
+-----------------------------------------------------
+An idempotent pipeline produces the same result no matter how many
+times it runs for the same input.
+
+WHY IT MATTERS:
+  - Pipelines fail and get rerun
+  - Network issues cause duplicate messages
+  - Backfills reprocess historical data
+  - Non-idempotent pipelines = duplicates, wrong aggregates
+
+HOW TO ACHIEVE IDEMPOTENCY:
+
+  1. Overwrite partition (not append):
+     - DELETE partition first, then INSERT
+     - Or use OVERWRITE mode in Spark
+
+  2. MERGE / UPSERT instead of INSERT:
+     - Handles duplicates naturally
+
+  3. Use deduplication keys:
+     - ROW_NUMBER() OVER (PARTITION BY id ORDER BY updated_at DESC)
+     - Keep only rn = 1
+
+  4. Unique constraints + ON CONFLICT in RDBMS
+
+  5. Track processed IDs in a control table:
+     - Skip already-processed records
+
+NON-IDEMPOTENT TRAP:
+  -- Appending without dedup — running twice doubles the data!
+  INSERT INTO target SELECT * FROM source WHERE date = '2024-01-01';
+
+  -- Idempotent version:
+  INSERT OVERWRITE target PARTITION(date='2024-01-01')
+  SELECT * FROM source WHERE date = '2024-01-01';
+
+------------------------------------------------------------------
+
+5.6 PIPELINE RELIABILITY PATTERNS
+------------------------------------
+Checkpointing
+  - Save progress state so pipeline resumes from last good point
+  - Not from scratch after failure
+  - Used in: Spark Streaming, Flink, Airflow
+
+Dead Letter Queue (DLQ)
+  - Bad records that fail processing go to a separate DLQ
+  - Main pipeline continues without blocking
+  - DLQ records investigated and reprocessed separately
+  - Common in Kafka pipelines
+
+Retry with Backoff
+  - On transient failure, retry with increasing delay
+  - Exponential backoff: 1s → 2s → 4s → 8s → give up
+  - Prevents hammering a failing downstream system
+
+Circuit Breaker
+  - After N consecutive failures, stop trying for a period
+  - Allows downstream system to recover
+  - After cooldown, try again
+
+Watermarking (Streaming)
+  - Define max lateness threshold for late-arriving events
+  - Events older than watermark discarded or handled separately
+  - Allows aggregation windows to close and emit results
+
+------------------------------------------------------------------
+
+5.7 PIPELINE ORCHESTRATION CONCEPTS
+--------------------------------------
+DAG (Directed Acyclic Graph)
+  - Tasks as nodes, dependencies as edges
+  - No cycles allowed (avoids infinite loops)
+  - Used in: Airflow, Prefect, Dagster
+
+Task Dependencies
+  - Upstream task must complete before downstream starts
+  - Fan-out: one task triggers multiple parallel tasks
+  - Fan-in: multiple tasks must complete before next step
+
+Backfill
+  - Rerun pipeline for historical date ranges
+  - Critical: pipeline must be idempotent for backfill to be safe
+
+SLA Monitoring
+  - Define expected completion time for each pipeline
+  - Alert if pipeline misses SLA
+  - Common interview: "How do you monitor pipeline health?"
+
+------------------------------------------------------------------
+
+5.8 COMMON ETL INTERVIEW QUESTIONS
+------------------------------------
+Q: "How do you handle duplicate records in a pipeline?"
+A: Deduplicate using ROW_NUMBER() with PARTITION BY natural key,
+   ORDER BY updated_at DESC, keep rn=1. Or use MERGE/UPSERT.
+   Prevent at source with unique constraints or CDC.
+
+Q: "How do you make a pipeline idempotent?"
+A: Use partition overwrite instead of append. Use MERGE instead of
+   INSERT. Track processed records in a control table.
+
+Q: "What is the difference between ETL and ELT?"
+A: ETL transforms before loading (traditional, limited by ETL server).
+   ELT loads raw first, transforms in DWH (modern, leverages cloud compute,
+   preserves raw data for reprocessing).
+
+Q: "How do you handle late-arriving data?"
+A: In batch: check if record belongs to a closed partition, trigger
+   backfill or partial reload. In streaming: use watermarks to define
+   max lateness. Late records beyond watermark go to DLQ or handled
+   with allowed_late_data setting.
+
+Q: "How do you handle schema changes in source systems?"
+A: Schema evolution strategy:
+   - Add column: usually safe (nullable)
+   - Rename column: track in schema registry, use mapping layer
+   - Delete column: mark deprecated, update downstream consumers
+   - Change data type: most dangerous — validate and test
+   Use Delta Lake schema evolution (mergeSchema) or Avro schema registry.
+
+================================================================
+NEXT: SECTION 6 — DATA WAREHOUSING
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 6: DATA WAREHOUSING
+================================================================
+
+6.1 WHAT IS A DATA WAREHOUSE?
+-------------------------------
+A central repository for integrated, historical, analytical data.
+Optimized for complex queries, not transactions.
+
+Characteristics:
+  Subject-oriented : Organized by business domain (sales, finance)
+  Integrated       : Data from multiple source systems unified
+  Non-volatile     : Data is not deleted or updated (append/snapshot)
+  Time-variant     : Historical data kept for trend analysis
+
+DWH vs Data Lake vs Data Lakehouse:
+  Data Warehouse : Structured, schema-on-write, SQL, fast queries
+  Data Lake      : All formats, schema-on-read, cheap storage, flexible
+  Data Lakehouse : Best of both — open formats + DWH performance
+                   (Databricks, Delta Lake, Iceberg, Hudi)
+
+------------------------------------------------------------------
+
+6.2 COLUMNAR STORAGE — WHY DWH IS FAST
+----------------------------------------
+Row storage: stores complete rows together
+  → Good for OLTP (fetch all columns of 1 row fast)
+
+Columnar storage: stores each column separately
+  → Good for OLAP (read only 2-3 columns from 1B rows fast)
+
+EXAMPLE:
+  Query: SELECT SUM(revenue) FROM sales WHERE year = 2024
+  Row store    : Read ALL columns of every row, extract revenue
+  Columnar     : Read ONLY year + revenue columns, skip everything else
+
+Additional benefits:
+  - Better compression (same data type values compress better)
+  - Vectorized execution (process column values in CPU batches)
+  - Predicate pushdown (skip whole column chunks via min/max stats)
+
+------------------------------------------------------------------
+
+6.3 SNOWFLAKE ARCHITECTURE
+----------------------------
+Multi-cluster shared data architecture. Three layers:
+
+  STORAGE LAYER (S3 / Azure Blob / GCS)
+    - Data stored as compressed columnar micro-partitions
+    - Completely separate from compute
+    - Shared by all virtual warehouses
+
+  COMPUTE LAYER (Virtual Warehouses)
+    - Independent clusters of compute nodes
+    - Each VW has its own CPU + RAM cache
+    - Multiple VWs can read same data simultaneously (no contention)
+    - Scale up: bigger VW (XS → S → M → L → XL → 4XL)
+    - Scale out: multi-cluster (more VWs for concurrency)
+    - Auto-suspend + auto-resume (pay only when running)
+
+  CLOUD SERVICES LAYER
+    - Query optimization (Cascade optimizer)
+    - Metadata management
+    - Authentication, access control
+    - Transaction management
+
+KEY FEATURES:
+  Zero-copy cloning   : Clone DB/table/schema instantly (no data copy)
+  Time Travel         : Query historical data (up to 90 days)
+  Fail-safe           : 7-day recovery after time travel expiry
+  Data sharing        : Share live data across accounts (no copy)
+  Micro-partitions    : ~16MB compressed chunks with min/max metadata
+  Partition pruning   : Query only relevant micro-partitions
+
+SNOWFLAKE PERFORMANCE TIPS:
+  - Cluster keys for large tables (like physical partitioning)
+  - Result cache: identical queries return cached result (free, 24h TTL)
+  - Metadata cache: VW keeps recently used micro-partition metadata
+  - Warehouse cache: local SSD cache of recently accessed data
+  - Use COPY INTO for bulk load (not INSERT row by row)
+  - Use transient/temporary tables for intermediate work
+
+------------------------------------------------------------------
+
+6.4 GOOGLE BIGQUERY ARCHITECTURE
+----------------------------------
+Serverless, fully managed DWH. No clusters to manage.
+
+  STORAGE (Capacitor columnar format on Colossus)
+    - Automatically managed, replicated
+    - Separated from compute (like Snowflake)
+
+  COMPUTE (Dremel execution engine)
+    - Massively parallel, serverless
+    - Query billed per bytes scanned (on-demand) or flat (slots)
+    - Slots = unit of compute (2000 slots ≈ 1 query at a time)
+
+KEY FEATURES:
+  Partitioning:
+    - Ingestion-time partition (_PARTITIONTIME)
+    - Column-based partition (date/timestamp/integer)
+    - ALWAYS partition large tables and filter on partition col
+
+  Clustering:
+    - Physical ordering of data within partitions (up to 4 columns)
+    - Reduces bytes scanned for filtered queries
+    - Use on high-cardinality columns queried with WHERE/JOIN
+
+  Partition + Cluster together = maximum performance
+
+  Federated queries : Query external data (GCS, Sheets) without loading
+  BI Engine        : In-memory analysis layer for dashboards
+  Materialized views: Pre-computed query results, auto-refreshed
+  Authorized views : Share query results without exposing raw tables
+
+BIGQUERY PERFORMANCE TIPS:
+  - Select only needed columns (columnar = pay per column scanned)
+  - Always filter on partition column in WHERE
+  - Use clustering for high-cardinality filter columns
+  - Avoid SELECT * (scans all columns, expensive)
+  - Use approximate aggregation (APPROX_COUNT_DISTINCT) when exact not needed
+  - Avoid cross joins and self joins on large tables
+  - Use ARRAY/STRUCT instead of joining small lookup tables
+
+------------------------------------------------------------------
+
+6.5 AMAZON REDSHIFT ARCHITECTURE
+----------------------------------
+Cluster-based columnar DWH (MPP — Massively Parallel Processing).
+
+  Leader Node   : Query planning, result aggregation, client interface
+  Compute Nodes : Store data + execute queries in parallel
+  Node slices   : Each node divided into slices (processing units)
+
+KEY CONCEPTS:
+  Distribution styles (how data is spread across nodes):
+    EVEN     : Round-robin distribution (uniform, no join key)
+    KEY      : Distribute on a column (collocate join data)
+    ALL      : Copy full table to every node (small dimension tables)
+    AUTO     : Redshift chooses (default, recommended)
+
+  Sort keys (like index, determines physical order):
+    COMPOUND : Multi-column, efficient for range queries on leading col
+    INTERLEAVED: Equal weight to all columns (flexible but slow vacuum)
+
+  VACUUM   : Reclaim space from deleted rows, re-sort data
+  ANALYZE  : Update table statistics for query optimizer
+
+REDSHIFT PERFORMANCE TIPS:
+  - Choose correct distribution key (common join column)
+  - Use sort keys on frequently filtered/joined columns
+  - Run VACUUM regularly on frequently updated tables
+  - Use COPY command for bulk load (parallel, compressed)
+  - Use compression encoding per column (AZ64, LZO, Zstd)
+  - Use WLM (Workload Management) queues for query prioritization
+
+------------------------------------------------------------------
+
+6.6 DWH DESIGN PATTERNS
+------------------------
+Inmon vs Kimball:
+
+  INMON (Top-Down)
+    - Build enterprise-wide normalized DWH first (3NF)
+    - Then build data marts for each department
+    - Single source of truth, consistent definitions
+    - Expensive, long time to first value
+
+  KIMBALL (Bottom-Up)
+    - Build dimensional data marts first (star schema)
+    - Integrate across data marts later via conformed dimensions
+    - Faster time to value, department-focused
+    - Most common in modern DWH
+
+Conformed Dimensions:
+    - Same dimension table used across multiple fact tables
+    - Example: DimDate used in FactSales AND FactInventory
+    - Enables cross-mart analysis
+
+------------------------------------------------------------------
+
+6.7 MATERIALIZED VIEWS vs REGULAR VIEWS
+-----------------------------------------
+Regular View
+  - Stored SQL query, no data stored
+  - Executes query every time view is queried
+  - Always fresh, but slow for complex queries
+
+Materialized View
+  - Query result physically stored
+  - Much faster to query (pre-computed)
+  - Needs refresh (manual or scheduled or on-commit)
+  - Stale between refreshes
+  - Use for: expensive aggregations queried frequently
+
+------------------------------------------------------------------
+
+6.8 COMMON DWH INTERVIEW QUESTIONS
+-------------------------------------
+Q: "How do you optimize a slow Snowflake query?"
+A: Check query profile for bottlenecks. Consider:
+   - Add cluster key if table lacks physical ordering
+   - Result cache hit? (identical query = free result)
+   - Increase VW size for memory-intensive queries
+   - Prune micro-partitions (add filters on cluster key columns)
+   - Check for data spill to disk (increase VW size)
+
+Q: "How does Snowflake handle concurrency?"
+A: Multi-cluster VW. Each VW is independent — multiple teams can
+   query simultaneously without resource contention. Auto-scale adds
+   more VW clusters under load, auto-suspends when idle.
+
+Q: "What is the difference between partitioning and clustering in BigQuery?"
+A: Partitioning: splits table into segments by column value — reduces
+   bytes scanned at the partition level.
+   Clustering: physically orders data within partitions by column —
+   further reduces bytes scanned within a partition.
+   Use both together for maximum performance.
+
+Q: "What distribution key would you choose in Redshift for a sales table
+   joining with a customer table?"
+A: Distribute both tables on customer_id (the join key). This collocates
+   matching rows on the same node, eliminating shuffle during join.
+   If customer table is small, use ALL distribution instead.
+
+================================================================
+NEXT: SECTION 7 — DATA LAKES & LAKEHOUSES
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 7: DATA LAKES & LAKEHOUSES
+================================================================
+
+7.1 DATA LAKE — THE PROBLEM IT SOLVES
+---------------------------------------
+Traditional DWH limitations:
+  - Schema-on-write: must define schema before loading
+  - Expensive for raw/unstructured data
+  - Hard to store semi-structured (JSON, logs) or unstructured (images)
+
+Data Lake solves this by:
+  - Storing ANY data format (CSV, JSON, Parquet, images, video, logs)
+  - Schema-on-read: define schema when querying, not loading
+  - Cheap object storage (S3, ADLS, GCS)
+  - Decoupled storage from compute
+
+DATA LAKE PROBLEMS (The "Data Swamp"):
+  - No ACID transactions → inconsistent reads during writes
+  - No schema enforcement → garbage data accumulates
+  - No versioning or time travel
+  - Lots of small files (performance killer)
+  - No reliable deletes or updates
+  - Hard to enforce data quality
+
+SOLUTION: Open Table Formats (Delta Lake, Apache Iceberg, Apache Hudi)
+
+------------------------------------------------------------------
+
+7.2 OPEN TABLE FORMATS — THE LAKEHOUSE LAYER
+----------------------------------------------
+Add a metadata + transaction log layer ON TOP of Parquet files in
+object storage. Give data lakes DWH-like properties.
+
+Three main formats:
+  Delta Lake  → Databricks-native, Linux Foundation project
+  Apache Iceberg → Netflix-originated, engine-agnostic
+  Apache Hudi  → Uber-originated, streaming-focused
+
+All three provide:
+  - ACID transactions
+  - Schema evolution
+  - Time travel
+  - Incremental reads (CDC)
+  - Compaction / optimization
+
+------------------------------------------------------------------
+
+7.3 DELTA LAKE — DEEP DIVE (Most Asked in Databricks Interviews)
+-----------------------------------------------------------------
+Delta Lake = Parquet files + _delta_log (transaction log)
+
+TRANSACTION LOG (_delta_log):
+  - JSON files recording every operation (add, remove, metadata)
+  - Each commit = one JSON file (00000.json, 00001.json, ...)
+  - Every 10 commits → Parquet checkpoint file (faster log reads)
+  - Enables ACID and time travel
+
+ACID IN DELTA LAKE:
+  Atomicity   : Write either fully commits or fully rolls back
+  Consistency : Schema enforcement on every write
+  Isolation   : Optimistic concurrency control (OCC)
+                Readers never block writers
+                Concurrent writers: conflict detected at commit time
+  Durability  : Committed data written to durable object storage
+
+TIME TRAVEL:
+  -- Query as of version
+  SELECT * FROM table VERSION AS OF 5;
+  SELECT * FROM delta.`/path/to/table` VERSION AS OF 5;
+
+  -- Query as of timestamp
+  SELECT * FROM table TIMESTAMP AS OF '2024-01-15';
+
+  -- In PySpark
+  df = spark.read.format("delta").option("versionAsOf", 5).load(path)
+
+  Restore table to prior version:
+  RESTORE TABLE table TO VERSION AS OF 5;
+
+DELTA LAKE KEY FEATURES:
+  Schema Enforcement  : Rejects writes that don't match table schema
+  Schema Evolution    : ALTER TABLE or use mergeSchema option
+  MERGE / UPSERT      : Full MERGE INTO syntax (insert/update/delete)
+  Change Data Feed    : Capture row-level changes for downstream consumers
+  Optimize            : Compact small files into larger ones
+  Z-ORDER             : Multi-dimensional clustering for faster queries
+  VACUUM              : Delete files no longer referenced (older than retention)
+  Liquid Clustering   : Next-gen replacement for Z-ORDER (Databricks)
+
+DELTA TABLE OPERATIONS:
+  -- Compact small files
+  OPTIMIZE table_name;
+
+  -- Compact + cluster data by column
+  OPTIMIZE table_name ZORDER BY (column1, column2);
+
+  -- Remove old unreferenced files (default 7-day retention)
+  VACUUM table_name RETAIN 168 HOURS;
+
+  -- View history
+  DESCRIBE HISTORY table_name;
+
+  -- Change data feed
+  ALTER TABLE table SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
+  SELECT * FROM table_changes('table_name', 1, 10);  -- versions 1-10
+
+SMALL FILE PROBLEM:
+  - Many small Parquet files → many metadata lookups → slow queries
+  - Caused by: streaming writes, frequent small batch jobs, CDC
+  - Fix: OPTIMIZE compacts small files into ~1GB target files
+  - Auto-optimize: delta.autoOptimize.optimizeWrite = true (Databricks)
+
+------------------------------------------------------------------
+
+7.4 APACHE ICEBERG — KEY CONCEPTS
+------------------------------------
+Engine-agnostic open table format (works with Spark, Flink, Trino,
+Athena, Snowflake, BigQuery).
+
+ICEBERG ARCHITECTURE:
+  Catalog      : Track current metadata pointer per table
+  Metadata file: Table schema, partition spec, snapshot list
+  Manifest list: List of manifest files per snapshot
+  Manifest file: List of data files with stats (min/max, null count)
+  Data files   : Actual Parquet/ORC/Avro data
+
+HIDDEN PARTITIONING:
+  - Partition logic hidden from query writers
+  - No need to write WHERE partition_col = X explicitly
+  - Iceberg applies partition transforms automatically (year, month, day, hour)
+  - Partition evolution: change partition scheme without rewriting data
+
+COPY-ON-WRITE vs MERGE-ON-READ:
+  Copy-on-Write (COW)
+    - On UPDATE/DELETE: rewrite entire affected data file
+    - Read: fast (clean files, no merging needed)
+    - Write: slow (full file rewrite)
+    - Use: read-heavy workloads
+
+  Merge-on-Read (MOR)
+    - On UPDATE/DELETE: write small delta files
+    - Read: merge base file + delta files at read time
+    - Write: fast (just append delta)
+    - Read: slightly slower (merge at read time)
+    - Use: write-heavy, CDC workloads
+
+------------------------------------------------------------------
+
+7.5 APACHE HUDI — KEY CONCEPTS
+--------------------------------
+Designed for incremental data processing and streaming ingestion.
+
+TWO TABLE TYPES:
+  Copy-on-Write (COW): Like Iceberg COW — full file rewrite on update
+  Merge-on-Read (MOR): Delta logs merged at read time
+
+KEY FEATURES:
+  - Incremental queries: read only changed records since a timestamp
+  - Record-level index: fast upserts (Bloom filter index by default)
+  - Timeline: every operation recorded (commit, compact, rollback)
+  - Cleaner: background removal of old file versions
+
+HUDI vs DELTA vs ICEBERG (High-level):
+  Delta Lake  : Best Databricks integration, rich SQL, easy to use
+  Iceberg     : Best engine-agnostic, hidden partitioning, schema evolution
+  Hudi        : Best for high-frequency upserts, streaming, CDC pipelines
+
+------------------------------------------------------------------
+
+7.6 SMALL FILES PROBLEM — IN DEPTH
+------------------------------------
+WHY SMALL FILES ARE BAD:
+  - Each file = one HDFS metadata entry / S3 object listing
+  - Each file = potentially one Spark task (tiny work per task)
+  - Metadata overhead dominates actual data processing
+  - Slows down directory listings, query planning, execution
+
+CAUSES:
+  - Streaming writes (Kafka → Delta, frequent micro-batch commits)
+  - Over-partitioned tables (too many partition columns)
+  - CDC with many small updates
+  - append mode without compaction
+
+FIXES:
+  - Delta OPTIMIZE / compaction jobs (scheduled)
+  - coalesce() before writing to reduce output partitions
+  - Auto-optimize writes (Databricks)
+  - Increase streaming trigger interval (fewer, larger commits)
+  - Merge small partitions (reduce partition granularity)
+
+------------------------------------------------------------------
+
+7.7 DATA LAKEHOUSE ARCHITECTURE
+---------------------------------
+Lakehouse = Data Lake storage + Table format (ACID, schema) +
+            DWH-style query performance
+
+Benefits over pure Data Lake:
+  - ACID transactions (no partial reads, no corruption)
+  - Schema enforcement + evolution
+  - BI-quality performance directly on lake
+  - Unified platform: batch + streaming + ML on same data
+
+Benefits over pure Data Warehouse:
+  - Cheaper storage (S3 vs proprietary DWH storage)
+  - Supports all data types (unstructured, semi-structured)
+  - No data copying (ML and BI work on same data)
+  - Open formats (no vendor lock-in)
+
+MODERN LAKEHOUSE STACK:
+  Storage  : S3 / ADLS / GCS
+  Format   : Delta Lake / Iceberg / Hudi
+  Compute  : Spark / Databricks / Trino / Flink
+  Catalog  : Unity Catalog / Glue / Hive Metastore / Nessie
+  Serving  : dbt / Spark SQL / BigQuery / Athena
+
+------------------------------------------------------------------
+
+7.8 COMMON INTERVIEW QUESTIONS — DATA LAKES & LAKEHOUSES
+----------------------------------------------------------
+Q: "What problems does Delta Lake solve over plain Parquet?"
+A: Plain Parquet has no ACID transactions — concurrent writes corrupt data,
+   readers see partial writes. Delta adds transaction log for ACID,
+   schema enforcement to reject bad data, time travel for auditing/rollback,
+   and MERGE for upserts. Also solves small files via OPTIMIZE.
+
+Q: "What is the difference between Delta Lake and Apache Iceberg?"
+A: Both are open table formats providing ACID on data lakes.
+   Delta is tightly integrated with Databricks/Spark.
+   Iceberg is more engine-agnostic (Spark, Flink, Trino, Athena, Snowflake).
+   Iceberg has more flexible hidden partitioning and partition evolution.
+   Delta has richer Databricks ecosystem features (liquid clustering, DLT).
+
+Q: "How does time travel work in Delta Lake?"
+A: Every write appends a new JSON file to _delta_log. Delta reads the
+   log to reconstruct table state at any prior version or timestamp.
+   VACUUM removes old files after retention period — after VACUUM,
+   time travel beyond retention window is no longer possible.
+
+Q: "What causes the small files problem and how do you fix it?"
+A: Streaming writes and frequent small batches create many tiny Parquet files.
+   Fix: run Delta OPTIMIZE to compact files into ~1GB targets.
+   Use coalesce() before writes. Enable auto-optimize on Databricks.
+   Consider increasing micro-batch interval in streaming.
+
+Q: "Copy-on-Write vs Merge-on-Read — which do you choose?"
+A: COW for read-heavy workloads — clean files, fast reads, slow writes.
+   MOR for write-heavy / CDC workloads — fast writes, slightly slower reads.
+   Most production Lakehouse setups use COW with periodic compaction.
+
+================================================================
+NEXT: SECTION 8 — STREAMING & REAL-TIME PROCESSING
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 8: STREAMING & REAL-TIME PROCESSING
+================================================================
+
+8.1 WHY STREAMING?
+-------------------
+Batch limitation: data is stale by hours/days
+Streaming solves: process data within milliseconds to seconds
+
+Use cases:
+  - Fraud detection (flag suspicious transaction NOW)
+  - Real-time dashboards (live metrics)
+  - IoT sensor processing
+  - Recommendation engines (user browsing behavior)
+  - Log monitoring and alerting
+
+------------------------------------------------------------------
+
+8.2 APACHE KAFKA — THE BACKBONE OF STREAMING
+----------------------------------------------
+Kafka is a distributed event streaming platform.
+Acts as a durable, high-throughput message queue between producers
+and consumers.
+
+CORE CONCEPTS:
+
+  Producer     : Writes (publishes) events to a topic
+  Consumer     : Reads (subscribes) events from a topic
+  Topic        : Named stream of records (like a table in a DB)
+  Partition    : Topic split into ordered, immutable log segments
+                 - Unit of parallelism in Kafka
+                 - Each partition on one broker
+                 - More partitions = more parallel consumers
+  Broker       : Kafka server (stores partitions)
+  Cluster      : Multiple brokers working together
+  ZooKeeper / KRaft: Cluster coordination (KRaft replacing ZooKeeper)
+  Consumer Group: Group of consumers sharing work across partitions
+                  Each partition assigned to ONE consumer in a group
+                  → Parallelism: # consumers ≤ # partitions
+  Offset       : Position of a record within a partition (monotonic)
+  Lag          : How far behind a consumer is from the latest offset
+
+KAFKA GUARANTEES:
+  Within a partition: messages are ORDERED
+  Across partitions : no global ordering guarantee
+  Durability        : messages replicated across brokers (replication factor)
+  Retention         : messages kept for configurable period (default 7 days)
+                      → consumers can replay from any offset
+
+DELIVERY SEMANTICS:
+  At-most-once  : Fire and forget. Message may be lost. No duplicates.
+  At-least-once : Retry on failure. No loss. May have duplicates.
+  Exactly-once  : Kafka transactions + idempotent producers.
+                  No loss, no duplicates. Most expensive.
+
+PRODUCER KEY CONCEPTS:
+  Partitioner   : Determines which partition message goes to
+                  - Key-based: same key → same partition (ordering)
+                  - Round-robin: no key → spread across partitions
+  Acks setting  :
+    acks=0 : No confirmation (fastest, data loss possible)
+    acks=1 : Leader confirms (balanced)
+    acks=all: All replicas confirm (safest, slowest)
+  Idempotent producer: enable.idempotence=true → dedup on retry
+
+CONSUMER KEY CONCEPTS:
+  Auto-commit   : Offset committed automatically (risk: process fails after
+                  commit but before processing complete)
+  Manual commit : Commit offset only after successful processing (safer)
+  Rebalancing   : When consumer joins/leaves group, partitions reassigned
+                  Causes brief pause in consumption
+
+KAFKA PERFORMANCE:
+  - Sequential disk writes (fast, even on HDD)
+  - Zero-copy transfer (sendfile syscall, no user-space copy)
+  - Batch compression (producer compresses batches)
+  - Page cache usage (OS caches recent data in RAM)
+
+------------------------------------------------------------------
+
+8.3 SPARK STRUCTURED STREAMING
+--------------------------------
+Continuous processing on unbounded DataFrames.
+"Treat streaming data as an infinite table" — append to it continuously.
+
+MICRO-BATCH vs CONTINUOUS PROCESSING:
+  Micro-batch (default)
+    - Process data in small batches at fixed intervals
+    - Exactly-once semantics (with checkpointing)
+    - Latency: ~100ms to seconds
+    - Trigger: Trigger.ProcessingTime("10 seconds")
+
+  Continuous Processing (experimental)
+    - True row-by-row processing
+    - At-least-once semantics
+    - Latency: ~1ms
+    - Trigger: Trigger.Continuous("1 second")
+
+READING FROM KAFKA:
+  df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "host:9092") \
+    .option("subscribe", "topic_name") \
+    .option("startingOffsets", "earliest") \
+    .load()
+
+  # Kafka value is binary — deserialize it
+  df = df.select(col("value").cast("string"), col("timestamp"))
+
+OUTPUT MODES:
+  Append   : Only new rows added to result table (default, no aggregation)
+  Complete : Full result table written every trigger (aggregations)
+  Update   : Only changed rows written (aggregations with watermark)
+
+CHECKPOINTING (Required for production):
+  - Saves query progress and state to durable storage
+  - Enables recovery from failure (resume from last checkpoint)
+  - Option: checkpointLocation = "/path/to/checkpoint"
+
+WRITING TO DELTA LAKE:
+  query = df.writeStream \
+    .format("delta") \
+    .outputMode("append") \
+    .option("checkpointLocation", "/checkpoint/path") \
+    .start("/delta/table/path")
+
+------------------------------------------------------------------
+
+8.4 EVENT TIME vs PROCESSING TIME
+------------------------------------
+Event Time    : When the event ACTUALLY occurred (in the data)
+Processing Time: When the event ARRIVES at the processing system
+
+WHY IT MATTERS:
+  Event arrives late due to: network delay, mobile offline, retries
+  If you aggregate by processing time → late events go into wrong window
+  If you aggregate by event time → correct window, but must handle late data
+
+ALWAYS use event time for business-critical aggregations.
+
+------------------------------------------------------------------
+
+8.5 WATERMARKS — HANDLING LATE DATA
+--------------------------------------
+A watermark tells Spark: "how late can data arrive before I discard it?"
+
+Watermark = max(event_time seen so far) - allowed_lateness
+
+Example: 10-minute watermark
+  - If latest event seen is at 12:00, watermark is at 11:50
+  - Events with event_time < 11:50 are dropped (too late)
+  - Windows older than watermark are closed and results emitted
+
+CODE:
+  df.withWatermark("event_time", "10 minutes") \
+    .groupBy(window("event_time", "5 minutes"), "user_id") \
+    .agg(count("*").alias("event_count"))
+
+TRADE-OFF:
+  Larger watermark → fewer late records dropped, more state held in memory
+  Smaller watermark → faster results emitted, more late records dropped
+
+------------------------------------------------------------------
+
+8.6 WINDOWING — AGGREGATION OVER TIME
+---------------------------------------
+Tumbling Window
+  - Fixed-size, non-overlapping windows
+  - Each event belongs to exactly ONE window
+  - Example: sales per 1-hour window (00:00-01:00, 01:00-02:00)
+  - window("event_time", "1 hour")
+
+Sliding Window
+  - Fixed-size, overlapping windows
+  - Event can belong to MULTIPLE windows
+  - Example: 1-hour window, slide every 15 minutes
+  - window("event_time", "1 hour", "15 minutes")
+  - Higher computation cost (more windows per event)
+
+Session Window
+  - Dynamic size based on activity gaps
+  - Window extends as long as events keep coming within gap threshold
+  - Closes when no events for gap duration
+  - Example: user session ends after 30 minutes of inactivity
+  - session_window("event_time", "30 minutes")
+
+------------------------------------------------------------------
+
+8.7 APACHE FLINK — KEY CONCEPTS
+---------------------------------
+True streaming engine (not micro-batch like Spark).
+Lower latency than Spark Structured Streaming.
+
+KEY DIFFERENCES FROM SPARK STREAMING:
+  - True row-by-row processing (not micro-batch)
+  - Stateful processing with managed state backends (RocksDB)
+  - More sophisticated event time + watermark handling
+  - Better suited for complex event processing (CEP)
+  - Exactly-once via distributed snapshots (Chandy-Lamport algorithm)
+
+FLINK vs SPARK STREAMING:
+  Latency      : Flink ~ms | Spark ~100ms-seconds
+  Throughput   : Both high
+  Exactly-once : Both support
+  State mgmt   : Flink richer (RocksDB, large state)
+  SQL support  : Both good (Flink SQL, Spark SQL)
+  Ecosystem    : Spark larger, more ML integration
+  Use Flink for: ultra-low latency, complex event processing
+  Use Spark for: unified batch+stream, ML pipelines, Databricks
+
+------------------------------------------------------------------
+
+8.8 KAFKA + SPARK STREAMING PATTERNS
+--------------------------------------
+Pattern 1 — Kafka → Spark Streaming → Delta Lake (Most Common)
+  Kafka topic → Spark readStream → transform → writeStream to Delta
+  Add watermark for late data handling
+  Checkpoint for fault tolerance
+
+Pattern 2 — Kafka → Spark → Kafka (Stream enrichment)
+  Read from input topic → enrich/transform → write to output topic
+
+Pattern 3 — CDC → Kafka → Spark → Lakehouse (CDC Pipeline)
+  Debezium → Kafka → Spark Streaming → MERGE into Delta table
+  Handles INSERT/UPDATE/DELETE from source DB in real-time
+
+EXACTLY-ONCE END-TO-END:
+  Kafka (idempotent producer + transactions)
+  + Spark (checkpointing + idempotent writes)
+  + Delta Lake (ACID transactions)
+  = Exactly-once semantics across entire pipeline
+
+------------------------------------------------------------------
+
+8.9 COMMON STREAMING INTERVIEW QUESTIONS
+------------------------------------------
+Q: "What is the difference between event time and processing time?"
+A: Event time is when the event occurred (embedded in the data).
+   Processing time is when the system receives it. For correct
+   time-based aggregations, always use event time. Handle late
+   data with watermarks.
+
+Q: "How do you handle late-arriving data in a streaming pipeline?"
+A: Use watermarks. Define max allowed lateness. Events within watermark
+   threshold are included in windows. Events beyond threshold go to
+   DLQ or are discarded depending on SLA requirements.
+
+Q: "What is a Kafka consumer group and how does it enable parallelism?"
+A: A consumer group has multiple consumers that share partitions.
+   Each partition is assigned to exactly one consumer in the group.
+   Parallelism = min(consumers, partitions). Adding more consumers
+   than partitions gives no benefit — some consumers stay idle.
+
+Q: "How does Spark Structured Streaming achieve exactly-once?"
+A: Checkpointing saves offset progress. Idempotent/transactional sinks
+   (Delta Lake) ensure no duplicates on reprocess. Together: read from
+   last checkpoint offset + write idempotently = exactly-once.
+
+Q: "When would you choose Flink over Spark Streaming?"
+A: Ultra-low latency requirements (milliseconds), complex event
+   processing (CEP), or very large stateful operations (RocksDB state
+   backend handles TB-scale state). For Databricks-native pipelines
+   or unified batch+stream+ML, prefer Spark.
+
+Q: "What happens during a Kafka rebalance?"
+A: When a consumer joins or leaves a group, Kafka coordinator
+   reassigns partitions among all consumers. During rebalance,
+   consumption pauses. Frequent rebalances cause lag spikes.
+   Minimize by using static group membership or increasing
+   session.timeout.ms.
+
+================================================================
+NEXT: SECTION 9 — CLOUD PLATFORMS (AWS / AZURE / GCP)
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 9: CLOUD PLATFORMS — AWS / AZURE / GCP
+================================================================
+
+9.1 CLOUD DATA ENGINEERING — THE BIG PICTURE
+----------------------------------------------
+Cloud platforms provide managed services so you don't manage
+infrastructure. As a DE, you need to know WHICH service to pick
+for WHICH problem — and the trade-offs.
+
+Three layers to know per cloud:
+  INGEST   : Get data in (batch + streaming)
+  STORE    : Where data lives (object, DB, DWH)
+  PROCESS  : Transform and compute
+  ORCHESTRATE: Schedule and monitor pipelines
+  SERVE    : BI tools, APIs, query engines
+
+------------------------------------------------------------------
+
+9.2 AWS — DATA ENGINEERING SERVICES MAP
+-----------------------------------------
+STORAGE:
+  S3              : Object storage for data lake (cheap, durable, scalable)
+  RDS             : Managed relational DB (MySQL, PostgreSQL, Oracle)
+  DynamoDB        : Managed NoSQL key-value/document store
+  ElastiCache     : Managed Redis/Memcached (caching layer)
+  Redshift        : Columnar MPP data warehouse
+
+INGESTION:
+  Kinesis Data Streams   : Real-time streaming (like Kafka, managed)
+  Kinesis Firehose       : Fully managed stream → S3/Redshift/Elasticsearch
+  AWS DMS                : Database Migration Service (CDC + full load)
+  AWS Glue (crawlers)    : Auto-discover and catalog data in S3
+  MSK (Managed Kafka)    : Fully managed Apache Kafka
+
+PROCESSING:
+  AWS Glue (ETL)  : Serverless Spark ETL (visual + code)
+  AWS EMR         : Managed Hadoop/Spark cluster (more control than Glue)
+  AWS Lambda      : Serverless functions (event-driven, small transforms)
+  AWS Athena      : Serverless SQL on S3 (pay per query, Presto-based)
+
+ORCHESTRATION:
+  AWS Step Functions : Visual workflow orchestration
+  Amazon MWAA        : Managed Airflow (Managed Workflows for Apache Airflow)
+  EventBridge        : Event-driven scheduling and routing
+
+CATALOGING & GOVERNANCE:
+  AWS Glue Data Catalog : Central metadata store (Hive-compatible)
+  AWS Lake Formation    : Data lake governance, access control
+
+BI / SERVING:
+  QuickSight      : AWS BI tool
+  Redshift Spectrum: Query S3 directly from Redshift
+
+KEY AWS ARCHITECTURE PATTERNS:
+  Simple Data Lake     : S3 → Glue Crawler → Glue Catalog → Athena
+  Streaming Pipeline   : Kinesis → Lambda/Glue → S3 → Athena/Redshift
+  DWH Pipeline         : RDS → DMS (CDC) → S3 → Glue ETL → Redshift
+  Modern Lakehouse     : S3 + Delta/Iceberg → EMR/Glue → Athena/Redshift
+
+GLUE vs EMR:
+  Glue  : Serverless, managed, less control, easier, pay per DPU/second
+  EMR   : Full Spark cluster, more control, cheaper for sustained workloads,
+          manage scaling yourself
+
+------------------------------------------------------------------
+
+9.3 AZURE — DATA ENGINEERING SERVICES MAP
+-------------------------------------------
+STORAGE:
+  ADLS Gen2      : Azure Data Lake Storage (object + hierarchical namespace)
+  Azure SQL DB   : Managed relational DB
+  Cosmos DB      : Managed multi-model NoSQL (key-value, document, graph)
+  Azure Cache    : Managed Redis
+  Azure Synapse  : Unified analytics (DWH + Spark + pipelines in one)
+
+INGESTION:
+  Azure Event Hubs  : Real-time streaming (Kafka-compatible)
+  Azure IoT Hub     : IoT device ingestion
+  Azure Data Factory: Managed ETL/ELT orchestration + data movement
+  Azure Database Migration Service: CDC + migration
+
+PROCESSING:
+  Azure Databricks  : Managed Spark (Delta Lake native, best in class)
+  Azure Synapse Spark: Spark within Synapse ecosystem
+  Azure HDInsight   : Managed Hadoop/Spark (legacy)
+  Azure Stream Analytics: Serverless real-time SQL on streams
+
+ORCHESTRATION:
+  Azure Data Factory (ADF): Pipeline orchestration + scheduling
+  Azure Databricks Workflows: Job orchestration within Databricks
+
+CATALOGING & GOVERNANCE:
+  Microsoft Purview  : Data governance, catalog, lineage, classification
+  Unity Catalog      : Databricks-native governance (tables, models, files)
+
+BI / SERVING:
+  Power BI           : Microsoft BI tool
+  Azure Analysis Services: OLAP cubes and semantic models
+
+KEY AZURE ARCHITECTURE PATTERNS:
+  Modern Analytics   : ADLS Gen2 → Databricks (Delta Lake) → Synapse/Power BI
+  Streaming Pipeline : Event Hubs → Databricks Streaming → Delta Lake
+  Enterprise DWH     : ADF → ADLS → Databricks → Synapse DWH
+  Lakehouse          : ADLS + Delta Lake + Databricks + Unity Catalog
+
+ADF vs Databricks Workflows:
+  ADF      : Best for data movement (copy activity), connects many sources,
+             visual pipeline builder, no code needed for simple copies
+  Databricks Workflows: Best for Spark-based transformations, notebook jobs,
+             tighter Delta Lake integration, better for DE-heavy pipelines
+
+------------------------------------------------------------------
+
+9.4 GCP — DATA ENGINEERING SERVICES MAP
+-----------------------------------------
+STORAGE:
+  GCS             : Google Cloud Storage (object storage for data lake)
+  Cloud SQL       : Managed relational DB (MySQL, PostgreSQL)
+  Firestore       : Managed NoSQL document store
+  Bigtable        : Managed wide-column NoSQL (HBase-compatible, IoT/TS)
+  BigQuery        : Serverless columnar DWH (also acts as compute)
+
+INGESTION:
+  Pub/Sub         : Real-time messaging (like Kafka, fully managed)
+  Dataflow        : Managed Apache Beam (batch + streaming unified)
+  Cloud Data Fusion: Managed ETL (visual, based on CDAP)
+  Database Migration Service: CDC + migration
+
+PROCESSING:
+  Dataproc        : Managed Hadoop/Spark cluster
+  Dataflow        : Unified batch + streaming (Apache Beam)
+  BigQuery         : Serverless SQL on petabyte scale
+  Cloud Functions  : Serverless event-driven functions
+
+ORCHESTRATION:
+  Cloud Composer  : Managed Apache Airflow
+  Cloud Workflows : Serverless workflow orchestration
+
+CATALOGING & GOVERNANCE:
+  Data Catalog    : Managed metadata and discovery
+  BigQuery Dataset: Access control at dataset level
+  Dataplex        : Unified data governance across GCS + BigQuery
+
+BI / SERVING:
+  Looker / Looker Studio: BI and dashboarding
+  BigQuery BI Engine    : In-memory acceleration for dashboards
+
+KEY GCP ARCHITECTURE PATTERNS:
+  Simple Lakehouse : GCS → Dataproc/Dataflow → BigQuery
+  Streaming        : Pub/Sub → Dataflow → BigQuery
+  Modern Analytics : GCS + BigQuery + dbt + Looker
+  Real-time CDC    : Cloud DMS → Pub/Sub → Dataflow → BigQuery
+
+Dataflow vs Dataproc:
+  Dataflow  : Serverless, auto-scaling, unified batch+stream (Apache Beam),
+              no cluster management, pay per use
+  Dataproc  : Managed Spark/Hadoop cluster, more control, faster startup,
+              cheaper for sustained Spark workloads
+
+------------------------------------------------------------------
+
+9.5 CROSS-CLOUD SERVICE EQUIVALENTS
+--------------------------------------
+  Use Case         | AWS              | Azure               | GCP
+  -----------------|------------------|---------------------|------------------
+  Object Storage   | S3               | ADLS Gen2           | GCS
+  Managed Spark    | EMR / Glue       | Databricks / Synapse| Dataproc
+  Serverless SQL   | Athena           | Synapse Serverless  | BigQuery
+  Data Warehouse   | Redshift         | Synapse DWH         | BigQuery
+  Streaming        | Kinesis / MSK    | Event Hubs          | Pub/Sub
+  Managed Kafka    | MSK              | Event Hubs (compat) | —
+  Stream Process   | Kinesis Analytics| Stream Analytics    | Dataflow
+  ETL/Orchestrate  | Glue / MWAA      | ADF / ADB Workflows | Composer/Fusion
+  Serverless ETL   | Glue             | ADF                 | Dataflow
+  CDC              | DMS              | ADF / DMS           | DMS / Datastream
+  Data Catalog     | Glue Catalog     | Purview             | Data Catalog
+  Governance       | Lake Formation   | Purview/Unity Cat.  | Dataplex
+  NoSQL            | DynamoDB         | Cosmos DB           | Firestore/Bigtable
+  BI               | QuickSight       | Power BI            | Looker
+
+------------------------------------------------------------------
+
+9.6 COST OPTIMIZATION ON CLOUD
+--------------------------------
+Storage:
+  - Use lifecycle policies (move old data to cold/archive tiers)
+  - S3: Standard → S3-IA → Glacier based on access frequency
+  - Compress data (Parquet + Snappy/Zstd)
+  - Partition tables (avoid full scans)
+
+Compute:
+  - Use spot/preemptible instances for batch jobs (60-80% cheaper)
+  - Auto-suspend idle DWH compute (Snowflake VW, Redshift pause)
+  - Right-size clusters (don't over-provision)
+  - Serverless for intermittent workloads (Athena, Glue, BigQuery)
+
+Query:
+  - Partition pruning (filter on partition key)
+  - BigQuery: avoid SELECT *, use preview for small checks
+  - Redshift: use COPY not INSERT, run VACUUM regularly
+  - Cache query results (Snowflake result cache, BigQuery slots)
+
+------------------------------------------------------------------
+
+9.7 COMMON CLOUD INTERVIEW QUESTIONS
+--------------------------------------
+Q: "How would you design a scalable data ingestion pipeline on AWS?"
+A: Source DB → DMS (CDC) → Kinesis/S3 → Glue ETL → Redshift or
+   S3 + Iceberg/Delta. Use S3 as landing zone, Glue for transforms,
+   Redshift for DWH, Athena for ad-hoc. Orchestrate with MWAA (Airflow).
+
+Q: "What's the difference between Glue and EMR?"
+A: Glue is serverless managed Spark — easier, no cluster management,
+   pay per DPU-second, limited configuration.
+   EMR gives full Spark cluster control — better for large sustained
+   workloads, custom configs, spot instances for cost savings.
+
+Q: "How do you reduce BigQuery costs?"
+A: Partition + cluster tables. Always filter on partition column.
+   Avoid SELECT *. Use approximate aggregations. Cache results.
+   Consider flat-rate pricing for predictable high usage.
+
+Q: "When would you use Azure Data Factory vs Databricks Workflows?"
+A: ADF for orchestrating data movement, connecting heterogeneous
+   sources, and low/no-code pipelines. Databricks Workflows for
+   Spark-heavy transformations, notebook orchestration, Delta Lake
+   pipelines. Often used together: ADF triggers Databricks jobs.
+
+================================================================
+NEXT: SECTION 10 — ORCHESTRATION & WORKFLOW MANAGEMENT
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 10: ORCHESTRATION & WORKFLOW MANAGEMENT
+================================================================
+
+10.1 WHY ORCHESTRATION?
+------------------------
+Data pipelines don't run in isolation. They have:
+  - Dependencies (job B runs only after job A succeeds)
+  - Schedules (run daily at 6am)
+  - Retries (retry on failure, alert on repeated failure)
+  - Monitoring (SLAs, alerts, logging)
+  - Backfills (rerun for past dates)
+
+Orchestration tools manage all of this.
+
+------------------------------------------------------------------
+
+10.2 APACHE AIRFLOW — THE INDUSTRY STANDARD
+---------------------------------------------
+Airflow is a platform to programmatically author, schedule,
+and monitor workflows as DAGs.
+
+CORE CONCEPTS:
+
+  DAG (Directed Acyclic Graph)
+    - Python file defining tasks and dependencies
+    - Acyclic = no circular dependencies
+    - Each DAG has a schedule (cron or timedelta)
+    - Lives in: $AIRFLOW_HOME/dags/
+
+  Task
+    - Individual unit of work in a DAG
+    - Defined using Operators
+
+  Operator
+    - Template for a task type
+    - PythonOperator    : Run Python function
+    - BashOperator      : Run bash command
+    - SparkSubmitOperator: Submit Spark job
+    - SqlOperator       : Run SQL
+    - KubernetesPodOperator: Run in K8s pod
+    - DatabricksRunNowOperator: Trigger Databricks job
+    - EmptyOperator     : Placeholder / dependency marker
+
+  Task Instance
+    - One run of a task for a specific execution_date
+    - States: queued → running → success / failed / skipped / retry
+
+  DAG Run
+    - One execution of the full DAG for a specific logical date
+    - Can be triggered manually or by schedule
+
+  Execution Date (Logical Date)
+    - The data interval this DAG run represents (NOT wall clock time)
+    - A DAG scheduled daily at 6am for 2024-01-15 has execution_date = 2024-01-14
+    - IMPORTANT: Airflow runs at the END of the interval, not start
+
+  XCom (Cross-Communication)
+    - Mechanism for tasks to pass small values to each other
+    - task_instance.xcom_push(key, value)
+    - downstream_task.xcom_pull(task_ids, key)
+    - WARNING: Not for large data — use S3/GCS paths instead
+
+AIRFLOW ARCHITECTURE:
+  Scheduler    : Parses DAG files, schedules task instances
+  Executor     : Runs tasks (LocalExecutor, CeleryExecutor, KubernetesExecutor)
+  Workers      : Execute tasks (for CeleryExecutor, multiple workers)
+  Webserver    : Airflow UI
+  Metadata DB  : Stores DAG/task state (PostgreSQL recommended)
+  Message Broker: Task queue for Celery (Redis or RabbitMQ)
+
+EXECUTOR TYPES:
+  SequentialExecutor : One task at a time, single machine (dev only)
+  LocalExecutor      : Parallel tasks, single machine (small prod)
+  CeleryExecutor     : Distributed workers via message queue (scalable)
+  KubernetesExecutor : Each task in its own K8s pod (most scalable, isolated)
+
+------------------------------------------------------------------
+
+10.3 AIRFLOW DAG PATTERNS
+---------------------------
+
+BASIC DAG STRUCTURE:
+  from airflow import DAG
+  from airflow.operators.python import PythonOperator
+  from datetime import datetime
+
+  with DAG(
+      dag_id="my_pipeline",
+      schedule_interval="0 6 * * *",   # 6am daily (cron)
+      start_date=datetime(2024, 1, 1),
+      catchup=False,                    # Don't backfill on first run
+      tags=["team_de"],
+  ) as dag:
+
+      extract = PythonOperator(task_id="extract", python_callable=extract_fn)
+      transform = PythonOperator(task_id="transform", python_callable=transform_fn)
+      load = PythonOperator(task_id="load", python_callable=load_fn)
+
+      extract >> transform >> load      # Set dependencies
+
+DEPENDENCY PATTERNS:
+  # Linear
+  a >> b >> c
+
+  # Fan-out (parallel)
+  a >> [b, c, d]
+
+  # Fan-in (wait for all)
+  [b, c, d] >> e
+
+  # Complex
+  a >> [b, c]
+  b >> d
+  c >> d
+  d >> e
+
+TRIGGER RULES (when task should run):
+  all_success (default) : Run only if all upstream succeeded
+  all_failed            : Run only if all upstream failed
+  all_done              : Run regardless of upstream status
+  one_success           : Run if at least one upstream succeeded
+  none_failed           : Run if no upstream failed (skipped is ok)
+  Use case: Notification task that runs whether pipeline succeeded or failed:
+    notify >> TriggerRule.ALL_DONE
+
+------------------------------------------------------------------
+
+10.4 AIRFLOW BEST PRACTICES
+-----------------------------
+  1. Keep DAGs idempotent — same run produces same result
+  2. Use catchup=False unless backfilling is intentional
+  3. Parameterize DAGs with Variables and Connections
+  4. Don't put heavy logic in top-level DAG file (slows scheduler)
+  5. Use task groups to organize complex DAGs visually
+  6. Use SLAs and email alerts for critical pipelines
+  7. Never use XCom for large data — pass paths (S3, GCS) instead
+  8. Use pools to limit concurrent tasks on shared resources
+  9. Short tasks > long tasks (easier to retry, better scheduling)
+  10. Use sensors carefully — they occupy worker slots while polling
+      (use reschedule mode, not poke mode, for long-running sensors)
+
+SENSOR MODES:
+  poke mode      : Worker held while waiting (wastes slot)
+  reschedule mode: Worker released between checks (efficient)
+  Always use reschedule for sensors waiting > a few minutes.
+
+------------------------------------------------------------------
+
+10.5 CRON EXPRESSIONS — READ THEM FAST
+----------------------------------------
+  Format: minute hour day-of-month month day-of-week
+
+  "0 6 * * *"      → 6:00 AM every day
+  "0 0 * * 1"      → Midnight every Monday
+  "0 */4 * * *"    → Every 4 hours
+  "30 8 1 * *"     → 8:30 AM on the 1st of every month
+  "0 0 * * 1-5"    → Midnight Monday–Friday
+  "@daily"         → Alias for "0 0 * * *"
+  "@hourly"        → Alias for "0 * * * *"
+  "@weekly"        → Alias for "0 0 * * 0"
+
+------------------------------------------------------------------
+
+10.6 MODERN ALTERNATIVES TO AIRFLOW
+--------------------------------------
+Prefect
+  - Python-native, simpler API than Airflow
+  - No DAG file parsing issues
+  - Dynamic task generation is easier
+  - Cloud: Prefect Cloud (managed UI + monitoring)
+  - Better error messages and debugging
+
+Dagster
+  - Asset-oriented orchestration (thinks in data assets, not tasks)
+  - Strong type system and software-engineering principles
+  - Asset lineage and observability built-in
+  - Best for teams that want testable, modular pipelines
+  - Software-defined assets: declare what data you produce, not just
+    what tasks you run
+
+dbt (data build tool)
+  - SQL-based transformation framework
+  - Not a full orchestrator but handles dependency ordering of SQL models
+  - Models, tests, documentation in one tool
+  - Typically orchestrated BY Airflow/Prefect/Dagster
+  - ref() function handles dependency resolution automatically
+
+COMPARISON:
+  Airflow  : Most mature, largest ecosystem, complex setup
+  Prefect  : Easier Python API, better debugging, hybrid execution
+  Dagster  : Best software-engineering principles, asset-first
+  dbt      : SQL transforms only, paired with an orchestrator
+
+------------------------------------------------------------------
+
+10.7 DBT — DATA BUILD TOOL (Must Know for Modern DE)
+------------------------------------------------------
+dbt transforms data inside your DWH using SQL.
+"ELT" — the T in ELT.
+
+CORE CONCEPTS:
+  Model    : A SQL SELECT statement saved as a .sql file
+             Each model = one table or view in the DWH
+  ref()    : Reference another model — dbt resolves dependencies
+             SELECT * FROM {{ ref('stg_orders') }}
+  source() : Reference raw source tables
+             SELECT * FROM {{ source('raw', 'orders') }}
+  Test     : Built-in data quality tests (unique, not_null, accepted_values)
+  Macro    : Reusable Jinja SQL snippets (like functions)
+  Seed     : Small static CSV files loaded as tables
+  Snapshot : SCD Type 2 implementation in dbt
+  Lineage  : Auto-generated DAG of model dependencies
+
+MATERIALIZATION TYPES:
+  view       : SQL view, recomputed every query (no storage)
+  table      : Full table recreated every run
+  incremental: Append or upsert only new/changed rows (efficient)
+  ephemeral  : CTE, not persisted, used within other models
+
+INCREMENTAL MODEL PATTERN:
+  {{ config(materialized='incremental', unique_key='order_id') }}
+  SELECT * FROM {{ source('raw', 'orders') }}
+  {% if is_incremental() %}
+    WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+  {% endif %}
+
+------------------------------------------------------------------
+
+10.8 COMMON ORCHESTRATION INTERVIEW QUESTIONS
+-----------------------------------------------
+Q: "What is the execution_date in Airflow and why is it confusing?"
+A: Execution_date (now called logical_date) represents the START of the
+   data interval, not when the task runs. A daily DAG scheduled at 6am
+   that runs on Jan 15 has execution_date = Jan 14 — it processes
+   Jan 14's data. New engineers often confuse it with wall-clock time.
+
+Q: "How do you backfill in Airflow?"
+A: Set catchup=True and Airflow will run all missed intervals since
+   start_date. Or use CLI: airflow dags backfill -s START -e END dag_id.
+   Ensure pipeline is idempotent before backfilling.
+
+Q: "How do you pass data between tasks in Airflow?"
+A: Use XCom for small values (task metadata, file paths, counts).
+   For large data, write to intermediate storage (S3, GCS, Delta) and
+   pass only the path via XCom. Never push DataFrames through XCom.
+
+Q: "What's the difference between Airflow and dbt?"
+A: Airflow is a general-purpose workflow orchestrator — schedules any
+   task (Python, Spark, SQL, bash). dbt is a SQL transformation
+   framework that runs inside a DWH. They complement each other:
+   Airflow orchestrates the pipeline, dbt handles the SQL transformations.
+
+Q: "What is a sensor in Airflow and when should you use it?"
+A: A sensor waits for an external condition (file arrives on S3, query
+   returns rows, API responds). Use for data-dependent pipelines where
+   you don't control when upstream data arrives. Always use
+   reschedule mode to avoid blocking worker slots.
+
+================================================================
+NEXT: SECTION 11 — DATA QUALITY & GOVERNANCE
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 11: DATA QUALITY & GOVERNANCE
+================================================================
+
+11.1 WHY DATA QUALITY MATTERS
+-------------------------------
+"Garbage in, garbage out."
+Bad data = wrong business decisions, failed ML models, compliance risk.
+
+Cost of bad data (Gartner): ~$12.9 million per year per organization.
+A senior DE is expected to PREVENT bad data, not just fix it.
+
+The Five Dimensions of Data Quality:
+  Completeness  : Is all expected data present? (no missing records)
+  Accuracy      : Does data reflect reality? (correct values)
+  Consistency   : Same data means same thing across systems
+  Timeliness    : Is data available when needed? (freshness)
+  Validity      : Does data conform to defined formats/rules?
+  Uniqueness    : No unintended duplicates
+
+------------------------------------------------------------------
+
+11.2 DATA QUALITY CHECKS — WHERE TO APPLY
+-------------------------------------------
+At ingestion (Bronze layer):
+  - Schema validation (correct column types?)
+  - Null checks on required fields
+  - Row count check (did all records arrive?)
+  - Duplicate primary key check
+
+At transformation (Silver layer):
+  - Referential integrity (foreign keys exist in dimension?)
+  - Value range checks (age > 0, price > 0)
+  - Regex pattern checks (email format, phone format)
+  - Cross-field validation (end_date > start_date)
+
+At serving (Gold layer):
+  - Aggregate sanity checks (total revenue today reasonable?)
+  - Row count vs yesterday's count (sudden drop = pipeline issue)
+  - Distribution checks (category % within expected range?)
+
+------------------------------------------------------------------
+
+11.3 GREAT EXPECTATIONS — INDUSTRY STANDARD TOOL
+--------------------------------------------------
+Framework for writing, running, and documenting data quality checks.
+
+CORE CONCEPTS:
+  Expectation     : A single assertion about your data
+                    e.g., "column 'email' must not be null"
+  Expectation Suite: Collection of expectations for a dataset
+  Validator       : Runs expectations against actual data
+  Data Docs       : Auto-generated HTML documentation of results
+  Checkpoint      : Bundle of suite + data to validate together
+
+COMMON EXPECTATIONS:
+  expect_column_to_exist("user_id")
+  expect_column_values_to_not_be_null("email")
+  expect_column_values_to_be_unique("order_id")
+  expect_column_values_to_be_between("age", 0, 120)
+  expect_column_values_to_match_regex("phone", r"^\d{10}$")
+  expect_column_values_to_be_in_set("status", ["active","inactive"])
+  expect_table_row_count_to_be_between(min_value=1000, max_value=1000000)
+  expect_column_pair_values_a_to_be_greater_than_b("end_date", "start_date")
+
+INTEGRATION PATTERN:
+  Airflow task → GE Checkpoint → Pass: continue pipeline
+                               → Fail: halt pipeline + alert + quarantine
+
+------------------------------------------------------------------
+
+11.4 DBT TESTS — BUILT-IN DATA QUALITY
+----------------------------------------
+dbt has built-in and custom test capabilities.
+
+GENERIC TESTS (in schema.yml):
+  - unique         : Column values are unique
+  - not_null       : No null values
+  - accepted_values : Values in a defined list
+  - relationships  : Foreign key referential integrity
+
+EXAMPLE schema.yml:
+  models:
+    - name: fct_orders
+      columns:
+        - name: order_id
+          tests:
+            - unique
+            - not_null
+        - name: status
+          tests:
+            - accepted_values:
+                values: ['placed', 'shipped', 'delivered', 'cancelled']
+        - name: customer_id
+          tests:
+            - relationships:
+                to: ref('dim_customers')
+                field: customer_id
+
+SINGULAR TESTS: Custom SQL tests — any query returning rows = FAIL
+  -- tests/no_negative_amounts.sql
+  SELECT order_id FROM fct_orders WHERE amount < 0
+
+------------------------------------------------------------------
+
+11.5 DATA CONTRACTS
+--------------------
+A formal agreement between data producers and consumers defining:
+  - Schema (column names, types, constraints)
+  - SLAs (freshness, availability)
+  - Quality guarantees (null rates, uniqueness)
+  - Versioning and change communication
+
+WHY DATA CONTRACTS MATTER:
+  Without: Producer changes schema → downstream pipelines break silently
+  With   : Schema changes must be communicated and versioned upfront
+
+IMPLEMENTATION:
+  - JSON Schema / Protobuf / Avro schema in schema registry
+  - dbt schema.yml as a lightweight contract
+  - OpenAPI-style contracts for data APIs
+  - Tools: Soda Core, dbt, Great Expectations, custom metadata
+
+INTERVIEW ANSWER: "How do you prevent upstream schema changes from
+breaking your pipelines?"
+  → Data contracts + schema registry + schema evolution policies.
+  Schema changes must be backward-compatible or communicated with
+  versioning. Use Delta Lake mergeSchema for controlled evolution.
+
+------------------------------------------------------------------
+
+11.6 DATA LINEAGE
+------------------
+Lineage = tracking where data came from and how it flows through systems.
+
+WHY LINEAGE MATTERS:
+  - Root cause analysis: "Which upstream table caused wrong revenue figures?"
+  - Impact analysis: "If I change this table, what breaks downstream?"
+  - Compliance/audit: "Where did this PII data come from?"
+  - Data trust: Engineers and analysts understand data provenance
+
+TYPES:
+  Column-level lineage : Trace specific column through transformations
+  Table-level lineage  : Which tables feed which tables
+  Job-level lineage    : Which pipeline/job produced this data
+
+TOOLS:
+  Apache Atlas   : Open-source metadata and governance
+  OpenLineage    : Open standard for lineage metadata (Marquez backend)
+  dbt            : Auto-generates model-level lineage (DAG)
+  Microsoft Purview: Enterprise lineage across Azure ecosystem
+  Databricks Unity Catalog: Column-level lineage across Delta tables
+  DataHub (LinkedIn): Open-source data discovery + lineage
+  Alation, Collibra: Enterprise data catalog with lineage
+
+------------------------------------------------------------------
+
+11.7 DATA GOVERNANCE
+---------------------
+Governance = policies, processes, and standards for managing data
+as a trusted asset across the organization.
+
+KEY COMPONENTS:
+  Data Catalog     : Inventory of all data assets with metadata
+  Data Dictionary  : Definitions of tables, columns, business terms
+  Access Control   : Who can see/use which data (RBAC, ABAC)
+  Data Classification: Tag sensitive data (PII, PCI, HIPAA)
+  Retention Policies: How long to keep data, when to delete
+  Audit Logging    : Who accessed what data and when
+
+PII & COMPLIANCE:
+  PII (Personally Identifiable Info): name, email, SSN, IP address
+  PCI DSS : Payment card data standards
+  HIPAA   : Healthcare data standards
+  GDPR    : EU data privacy (right to be forgotten)
+  CCPA    : California consumer privacy
+
+HANDLING PII IN PIPELINES:
+  - Mask/tokenize PII at ingestion (before storing in raw layer)
+  - Encrypt sensitive columns (AES-256)
+  - Row-level security (users see only their own data)
+  - Column-level masking (analysts see masked SSN)
+  - Audit access logs
+  - Data minimization (don't store what you don't need)
+
+TOOLS:
+  Unity Catalog (Databricks): RBAC, column masking, row filters, lineage
+  AWS Lake Formation        : Fine-grained access on data lake
+  Apache Ranger             : Hadoop ecosystem access control
+  Microsoft Purview         : Azure enterprise governance
+
+------------------------------------------------------------------
+
+11.8 DATA OBSERVABILITY
+------------------------
+Monitoring the health of data pipelines and data quality over time.
+"Know about data problems before your stakeholders do."
+
+FIVE PILLARS OF DATA OBSERVABILITY:
+  Freshness    : Is data up to date? (when was table last updated?)
+  Volume       : Does row count look normal? (sudden drop = issue)
+  Schema       : Did schema change unexpectedly?
+  Distribution : Are values within expected statistical range?
+  Lineage      : Which upstream change caused this anomaly?
+
+TOOLS:
+  Monte Carlo  : ML-based anomaly detection on data health
+  Soda Core    : Open-source data quality checks + monitoring
+  Elementary   : dbt-native data observability
+  Great Expectations: Validation + documentation
+
+MONITORING PATTERNS:
+  - Table freshness alerts (last_updated > threshold)
+  - Row count comparison (today vs 7-day avg, alert on >20% drop)
+  - Null rate monitoring (alert if null % spikes)
+  - Schema change detection (column added/removed/type changed)
+  - SLA miss alerts (pipeline didn't complete by expected time)
+
+------------------------------------------------------------------
+
+11.9 COMMON DATA QUALITY INTERVIEW QUESTIONS
+----------------------------------------------
+Q: "How do you ensure data quality in your pipelines?"
+A: Multi-layer approach:
+   1. Schema enforcement at ingestion (Delta Lake, Avro schema registry)
+   2. Automated quality checks (Great Expectations / dbt tests)
+      at Bronze → Silver → Gold transitions
+   3. Data contracts with upstream producers
+   4. Monitoring (freshness, volume, distribution alerts)
+   5. DLQ for bad records (don't block pipeline, investigate separately)
+   6. SLA alerts when pipelines miss expected completion
+
+Q: "How do you handle PII in a data pipeline?"
+A: Classify and tag PII at source. Mask/tokenize before landing in
+   data lake (at ingestion layer). Apply column-level masking and
+   row-level security in catalog (Unity Catalog / Lake Formation).
+   Audit all access. Implement retention policies. Handle GDPR
+   right-to-erasure with soft deletes or partition drops.
+
+Q: "What is data lineage and why does it matter?"
+A: Lineage tracks the origin and transformation path of data.
+   Critical for: debugging wrong numbers (trace to source),
+   impact analysis (what breaks if I change X), compliance audits,
+   and building trust with data consumers.
+
+Q: "What is a data contract and how do you implement one?"
+A: A formal agreement on schema, quality, and SLAs between producer
+   and consumer. Implement via schema registry (Avro/Protobuf),
+   dbt schema.yml for SQL models, or tools like Soda/Great Expectations.
+   Key: schema changes must be backward-compatible or versioned.
+
+================================================================
+NEXT: SECTION 12 — PERFORMANCE TUNING & OPTIMIZATION
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 12: PERFORMANCE TUNING & OPTIMIZATION
+================================================================
+
+12.1 THE OPTIMIZATION MINDSET
+-------------------------------
+Don't optimize blindly. Follow this order:
+  1. MEASURE    : Identify the bottleneck (Spark UI, EXPLAIN, query profile)
+  2. UNDERSTAND : Why is it slow? (shuffle? skew? bad join? small files?)
+  3. FIX        : Apply targeted fix
+  4. VERIFY     : Measure again — did it actually improve?
+
+Premature optimization wastes time. Profile first, fix second.
+
+------------------------------------------------------------------
+
+12.2 SPARK PERFORMANCE TUNING — DEEP DIVE
+-------------------------------------------
+READING THE SPARK UI:
+  Jobs tab      : List of actions triggered, duration per job
+  Stages tab    : Each stage = set of tasks between shuffles
+  Tasks tab     : Per-task timing, data read/written, GC time
+  SQL tab       : Query plan (physical + logical), stage breakdown
+  Storage tab   : What's cached and how much memory used
+  Environment   : All Spark configs in effect
+
+KEY METRICS TO WATCH:
+  Shuffle read/write size  → High = expensive shuffles
+  GC time > 10% task time  → Memory pressure, tune executor memory
+  Task skew (one task 10x longer) → Data skew on key
+  Spill to disk            → Not enough memory for shuffle/aggregation
+  Small tasks (< 100ms)    → Too many partitions, use coalesce
+
+MEMORY TUNING:
+  spark.executor.memory        → Total executor memory
+  spark.executor.memoryFraction→ Fraction for execution vs storage
+  spark.memory.offHeap.enabled → Use off-heap for large datasets
+  spark.executor.cores         → Tasks per executor (2-5 recommended)
+
+  Memory breakdown per executor:
+    Reserved  : 300MB (system)
+    User      : 40% (user code, data structures)
+    Spark     : 60% (execution + storage, shared pool)
+      Execution: shuffle, sort, joins, aggregations
+      Storage  : cached DataFrames/RDDs
+
+PARTITION TUNING:
+  spark.sql.shuffle.partitions (default: 200)
+    Too high → many tiny tasks, scheduling overhead
+    Too low  → large tasks, OOM, slow
+    Rule: (total data size after shuffle) / 128MB
+    Example: 12GB shuffle → 12000/128 ≈ 100 partitions
+
+  spark.default.parallelism
+    Controls RDD operations default parallelism
+    Set to: total executor cores * 2-3
+
+BROADCAST JOIN TUNING:
+  spark.sql.autoBroadcastJoinThreshold (default: 10MB)
+    Increase if you have small dimension tables (up to ~200MB)
+    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "200m")
+    Or hint: df.join(broadcast(small_df), "key")
+
+AQE (Adaptive Query Execution) — Always Enable in Spark 3:
+  spark.sql.adaptive.enabled = true
+  spark.sql.adaptive.coalescePartitions.enabled = true  → merge small partitions
+  spark.sql.adaptive.skewJoin.enabled = true            → auto-handle skew
+  spark.sql.adaptive.localShuffleReader.enabled = true  → optimize local reads
+
+SERIALIZATION:
+  spark.serializer = org.apache.spark.serializer.KryoSerializer
+    → Faster and smaller than default Java serializer
+    → Register custom classes for best performance
+
+------------------------------------------------------------------
+
+12.3 DATA SKEW — DIAGNOSIS AND FIXES
+--------------------------------------
+SYMPTOMS:
+  - Spark UI shows one task running 10x-100x longer than others
+  - "Straggler task" — 99 tasks done, 1 stuck for minutes
+  - OOM on specific tasks
+
+DIAGNOSIS:
+  df.groupBy("key").count().orderBy(col("count").desc()).show(10)
+  → Find which keys have disproportionate row counts
+
+FIX 1 — Broadcast join (if one side is small):
+  df_large.join(broadcast(df_small), "key")
+
+FIX 2 — Salting (for groupBy/join skew):
+  # Add random salt to skewed key
+  from pyspark.sql.functions import concat, lit, (rand()*10).cast("int")
+
+  # Step 1: Salt the skewed side
+  skewed_df = skewed_df.withColumn("salted_key",
+    concat(col("key"), lit("_"), (rand()*10).cast("int").cast("string")))
+
+  # Step 2: Explode the other side with all salt values
+  other_df = other_df.withColumn("salt", explode(array([lit(i) for i in range(10)])))
+  other_df = other_df.withColumn("salted_key",
+    concat(col("key"), lit("_"), col("salt").cast("string")))
+
+  # Step 3: Join on salted key, then aggregate
+  result = skewed_df.join(other_df, "salted_key").groupBy("key").agg(...)
+
+FIX 3 — AQE skew join (automatic, Spark 3+):
+  spark.sql.adaptive.skewJoin.enabled = true
+  → Spark auto-detects and splits skewed partitions
+
+FIX 4 — Repartition on skewed key before join:
+  df.repartition(200, "key")  # Force even distribution
+
+------------------------------------------------------------------
+
+12.4 SQL QUERY TUNING — ADVANCED
+----------------------------------
+READING EXPLAIN PLANS:
+  df.explain(True)         → Extended (parsed, analyzed, optimized, physical)
+  EXPLAIN EXTENDED sql;    → In SQL
+  EXPLAIN ANALYZE sql;     → Actually runs + shows actual row counts
+
+KEY OPERATIONS TO SPOT:
+  BroadcastHashJoin     → Good (small table broadcast, no shuffle)
+  SortMergeJoin         → Shuffle on both sides (expensive for large tables)
+  HashAggregate         → Good (in-memory aggregation)
+  Exchange (Shuffle)    → Data moving across partitions (check size)
+  FileScan              → Check partition pruning happening
+  Filter                → Should be pushed down close to FileScan
+
+PREDICATE PUSHDOWN:
+  Spark pushes WHERE filters down to data source to minimize data read.
+  Works with: Parquet, Delta, ORC, JDBC
+  Breaks if: filter is on a computed column, UDF used in filter
+
+COLUMN PRUNING:
+  Spark reads only columns used in query (columnar formats).
+  Breaks if: SELECT * (forces all columns read)
+
+PARTITION PRUNING:
+  Spark skips partitions not matching filter.
+  Requires: filter on partition column, no function wrapping partition col
+
+AVOID:
+  - Python UDFs (breaks JVM optimization, serialization overhead)
+  - Cartesian products (accidental cross joins)
+  - Correlated subqueries (re-execute per row)
+  - DISTINCT on huge datasets (triggers shuffle)
+  - collect() / toPandas() on large DataFrames
+
+USE INSTEAD:
+  - Native Spark SQL functions (pyspark.sql.functions)
+  - Window functions instead of self-joins
+  - approx_count_distinct() when exact not needed (HyperLogLog)
+  - df.limit(n) instead of collect() for sampling
+
+------------------------------------------------------------------
+
+12.5 DELTA LAKE PERFORMANCE TUNING
+-------------------------------------
+OPTIMIZE + ZORDER:
+  OPTIMIZE table ZORDER BY (date, customer_id)
+  → Compact small files + cluster data for fast filtered reads
+  → Run after heavy write batches or on schedule
+
+LIQUID CLUSTERING (Databricks, newer):
+  ALTER TABLE table CLUSTER BY (date, customer_id)
+  → Incremental clustering, no full rewrite needed
+  → Better than ZORDER for frequently evolving access patterns
+
+BLOOM FILTERS:
+  CREATE BLOOMFILTER INDEX ON TABLE t FOR COLUMNS (id)
+  → Fast lookup for point queries on high-cardinality columns
+  → Reduces files scanned for needle-in-haystack queries
+
+DELETION VECTORS (Databricks):
+  → Instead of rewriting Parquet files on DELETE, mark deleted rows
+  → Much faster deletes and updates
+  → Reads merge deletion vectors at query time
+
+FILE SIZE TUNING:
+  delta.targetFileSize = 128MB (default)
+  Increase for read-heavy tables: 256MB-1GB
+  Decrease for write-heavy tables with frequent small updates
+
+STATISTICS:
+  Delta collects min/max/null count per column per file
+  → Enables data skipping (skip files where min > filter value)
+  ANALYZE TABLE table COMPUTE STATISTICS FOR ALL COLUMNS;
+
+------------------------------------------------------------------
+
+12.6 DATABASE QUERY TUNING (General)
+--------------------------------------
+INDEX USAGE CHECK:
+  EXPLAIN SELECT ... → check if index scan or full table scan
+
+COMMON CAUSES OF FULL TABLE SCANS:
+  - No index on filter/join column
+  - Function on indexed column: WHERE UPPER(name) = 'JOHN'
+  - Leading wildcard: WHERE name LIKE '%john%'
+  - NULL comparison: WHERE col = NULL (use IS NULL)
+  - OR conditions (can prevent index use)
+  - Low selectivity (index on boolean rarely used by optimizer)
+
+JOIN ORDER:
+  Filter most selective table first
+  Smallest result set drives the join (optimizer usually handles this)
+  Use hints if optimizer makes bad choice
+
+STATISTICS:
+  Outdated statistics = bad query plans
+  Run ANALYZE TABLE / UPDATE STATISTICS regularly after bulk loads
+
+MATERIALIZED VIEWS:
+  Pre-compute expensive aggregations
+  Refresh on schedule or on-demand
+  Trades storage + refresh cost for query speed
+
+------------------------------------------------------------------
+
+12.7 PIPELINE-LEVEL OPTIMIZATION
+----------------------------------
+Push filters early (source → bronze → silver):
+  Only read what you need at each stage
+
+Avoid re-reading the same data multiple times:
+  Cache if reused, or write once and reference
+
+Parallelize independent tasks:
+  Don't run sequential when tasks are independent
+
+Right-size batch windows:
+  Too small → overhead, small files
+  Too large → long recovery time on failure
+
+Avoid full reloads when incremental is possible:
+  Incremental load = less data scanned + less compute
+
+Monitor and auto-scale:
+  Use cloud auto-scaling to match compute to data volume
+
+------------------------------------------------------------------
+
+12.8 COMMON PERFORMANCE INTERVIEW QUESTIONS
+---------------------------------------------
+Q: "Your Spark job is running slow. How do you debug it?"
+A: Open Spark UI. Check:
+   1. Which stage is slowest? → Focus there
+   2. Is there shuffle? How much data? → Reduce with broadcast/filter early
+   3. Task skew? → One task 10x longer → data skew → salt or broadcast
+   4. Spill to disk? → Not enough memory → increase executor memory or partitions
+   5. GC time high? → Memory pressure → tune memory fractions
+   6. Too many/too few partitions? → Tune shuffle.partitions
+   7. Check physical plan (df.explain) → Missing pushdown? Bad join type?
+
+Q: "How do you optimize a join between a 1TB and a 1GB table in Spark?"
+A: Broadcast the 1GB table (increase autoBroadcastJoinThreshold).
+   Spark sends full 1GB to every executor → no shuffle needed.
+   If 1GB is too big to broadcast, ensure both tables partitioned
+   on join key and use sort-merge join with pre-partitioning.
+
+Q: "What is data skew and how do you handle it?"
+A: Skew = uneven data distribution where some keys have far more rows.
+   Causes: NULLs, popular IDs, categorical imbalance.
+   Fix: broadcast join, salting, AQE skew join (Spark 3+).
+   Diagnose: Spark UI straggler tasks or groupBy count on join key.
+
+Q: "How do you reduce shuffle in a Spark job?"
+A: Filter data early before groupBy/join. Broadcast small tables.
+   Pre-partition data on join key (repartition before repeated joins).
+   Use reduceByKey instead of groupByKey (pre-aggregates on map side).
+   Enable AQE to dynamically coalesce shuffle partitions.
+
+================================================================
+NEXT: SECTION 13 — SYSTEM DESIGN FOR DATA ENGINEERING
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 13: SYSTEM DESIGN FOR DATA ENGINEERING
+================================================================
+
+13.1 HOW TO APPROACH A SYSTEM DESIGN QUESTION
+-----------------------------------------------
+Interviewers want to see structured thinking, not a perfect answer.
+
+FRAMEWORK (use this every time):
+  1. CLARIFY requirements (ask 3-4 questions before designing)
+  2. ESTIMATE scale (data volume, frequency, latency needs)
+  3. IDENTIFY components (ingest, store, process, serve)
+  4. DESIGN the architecture (draw it out verbally)
+  5. ADDRESS trade-offs (why this choice vs alternatives)
+  6. DISCUSS failure modes & reliability
+  7. DISCUSS monitoring & observability
+
+QUESTIONS TO ALWAYS ASK:
+  - What is the data volume? (GB/day vs TB/day vs PB/day)
+  - What is the latency requirement? (real-time, near-real-time, batch?)
+  - What are the consumers? (BI, ML, APIs, other pipelines?)
+  - Are there compliance/PII requirements?
+  - What is the SLA for data freshness?
+  - Is the schema fixed or flexible?
+
+------------------------------------------------------------------
+
+13.2 DESIGN: REAL-TIME FRAUD DETECTION PIPELINE
+-------------------------------------------------
+PROBLEM: Design a system to detect fraudulent transactions in real-time.
+
+REQUIREMENTS CLARIFICATION:
+  - 100K transactions/second at peak
+  - Fraud decision needed within 500ms
+  - Historical data needed for ML model features
+  - Alert fraud team and block transaction
+
+ARCHITECTURE:
+
+  [Payment Service]
+       ↓
+  [Kafka - transactions topic]  ← high-throughput, durable buffer
+       ↓
+  [Flink / Spark Streaming]     ← real-time feature computation
+    - Enrich with user history (Redis lookup)
+    - Compute: txn velocity (last 5 min), location change, amount anomaly
+       ↓
+  [ML Model Service]            ← score transaction (REST/gRPC < 50ms)
+       ↓
+  ┌────────────────────────────┐
+  │ Score < threshold → PASS  │
+  │ Score > threshold → BLOCK │  → Alert fraud team (Kafka alert topic)
+  └────────────────────────────┘
+       ↓
+  [Delta Lake / DWH]            ← store all transactions + scores for retraining
+       ↓
+  [ML Feature Store]            ← update user features for future scoring
+
+KEY COMPONENTS:
+  Kafka       : Buffer spikes, decouple producer from consumer
+  Redis       : Sub-millisecond feature lookup (user history, velocity)
+  Flink       : Low-latency stateful stream processing
+  ML Service  : Pre-trained model served via REST (not in Spark)
+  Delta Lake  : Historical store for model retraining + audit
+  Feature Store: Consistent features between training and serving
+
+TRADE-OFFS TO DISCUSS:
+  - Flink vs Spark: Flink for < 100ms latency, Spark for simplicity
+  - Redis vs DB: Redis for speed, DB for durability
+  - Synchronous vs Async scoring: sync for blocking, async for alerting
+  - Exactly-once: Kafka idempotent + Flink checkpointing
+
+------------------------------------------------------------------
+
+13.3 DESIGN: BATCH DATA PIPELINE FOR ANALYTICS
+------------------------------------------------
+PROBLEM: Build a pipeline to process 1TB/day of e-commerce events
+         into analytics dashboards. Data arrives as JSON in S3.
+
+ARCHITECTURE (Medallion + ELT):
+
+  [Source Systems: Web, App, Backend]
+       ↓
+  [Kafka / Kinesis Firehose]    ← stream events to S3 in near-real-time
+       ↓
+  [S3 Bronze Layer]             ← raw JSON, partitioned by date/hour
+  (schema: event_type, user_id, timestamp, payload)
+       ↓
+  [Spark / Databricks Job]      ← scheduled daily at 2am
+    - Parse JSON, validate schema
+    - Deduplicate events (ROW_NUMBER on event_id)
+    - Cast types, standardize timestamps (UTC)
+    - Write as Parquet/Delta → S3 Silver Layer
+       ↓
+  [Silver Layer - Delta]        ← clean, typed, deduplicated events
+       ↓
+  [dbt Models]                  ← SQL transformations
+    - Dimensional models (dim_users, dim_products)
+    - Fact tables (fct_orders, fct_pageviews)
+    - Business aggregations (daily_revenue, funnel_conversion)
+    - Write to Gold Layer
+       ↓
+  [Gold Layer - DWH]            ← Redshift / Snowflake / BigQuery
+       ↓
+  [BI Tool]                     ← Tableau, Power BI, Looker
+
+ORCHESTRATION: Airflow
+  DAG: ingest → validate → transform (Bronze→Silver) → dbt run → test → notify
+
+DATA QUALITY:
+  - Great Expectations on Bronze → Silver transition
+  - dbt tests on all Gold models
+  - Row count comparison vs prior day (>20% drop = alert)
+
+FAILURE HANDLING:
+  - Idempotent: partition overwrite mode
+  - DLQ: bad records to quarantine S3 bucket
+  - Retry: 3 retries with exponential backoff
+  - Alerts: PagerDuty on SLA miss
+
+------------------------------------------------------------------
+
+13.4 DESIGN: NEAR-REAL-TIME CDC PIPELINE
+------------------------------------------
+PROBLEM: Sync a production MySQL database (500GB, 10K writes/sec)
+         to a data warehouse in near-real-time (< 5 min lag).
+
+ARCHITECTURE:
+
+  [MySQL Production DB]
+       ↓ (binary log)
+  [Debezium Connector]          ← reads MySQL binlog (zero impact on DB)
+       ↓
+  [Kafka Topics]                ← one topic per table
+  (e.g., db.customers, db.orders)
+       ↓
+  [Spark Structured Streaming / Flink]
+    - Deserialize Avro messages
+    - Parse op field: c (create), u (update), d (delete)
+    - Apply MERGE INTO Delta table:
+        c/u → upsert by primary key
+        d   → soft delete (set is_deleted=true) or hard delete
+       ↓
+  [Delta Lake (Silver)]         ← near-real-time replica of source
+       ↓
+  [dbt incremental models]      ← transform to dimensional models
+       ↓
+  [DWH / BI Layer]
+
+HANDLING DELETES:
+  Option A: Soft delete (add is_deleted=true, filter in downstream)
+  Option B: Hard delete (MERGE with DELETE clause — supported in Delta)
+  Option C: SCD Type 2 (track history, mark old rows inactive)
+  Choice depends on: compliance needs, downstream query patterns
+
+SCHEMA EVOLUTION:
+  Source DB adds column → Debezium picks it up → Kafka message has new field
+  → Delta Lake mergeSchema=true → column auto-added → downstream notified
+
+MONITORING:
+  - Kafka consumer lag per topic (alert if lag > 5 min worth of messages)
+  - Debezium connector status (dead connector = no CDC)
+  - Row count parity check: source DB count vs Delta table count
+
+------------------------------------------------------------------
+
+13.5 DESIGN: ML FEATURE STORE PIPELINE
+----------------------------------------
+PROBLEM: Build a feature store for an ML team that needs consistent
+         features for both training and real-time inference.
+
+ARCHITECTURE:
+
+  [Source Data: Events, DB, Logs]
+       ↓
+  [Spark Batch Jobs]            ← compute historical features
+  (e.g., user_30day_purchase_count, avg_session_duration)
+       ↓
+  [Offline Feature Store]       ← Delta Lake / BigQuery
+  Used for: training data generation, backfills
+       ↓                        ↑ sync (hourly/daily)
+  [Online Feature Store]        ← Redis / DynamoDB / Cassandra
+  Used for: real-time inference (< 10ms lookup)
+       ↓
+  [ML Model]                    ← same feature names/logic as training
+       ↓
+  [Prediction Serving]
+
+KEY DESIGN PRINCIPLE — Training/Serving Skew:
+  Problem: features computed differently at training vs serving → model drift
+  Solution: single feature definition used by both batch (offline) and
+            real-time (online) pipelines. Same code, same logic.
+
+TOOLS: Databricks Feature Store, Feast, Tecton, Hopsworks
+
+------------------------------------------------------------------
+
+13.6 DESIGN: DATA LAKE GOVERNANCE
+-----------------------------------
+PROBLEM: Your company has 200 data engineers, 50 analysts, and
+         100 data scientists all accessing a shared data lake.
+         Design a governance model.
+
+ARCHITECTURE:
+
+  [Unity Catalog / Lake Formation]
+    - Single catalog for all data assets (tables, files, models)
+    - Role-Based Access Control (RBAC):
+        Data Engineers → write to Bronze/Silver, read Gold
+        Analysts       → read Gold only
+        Data Scientists→ read Silver/Gold, write to ML workspace
+    - Column-level masking (PII columns masked for non-privileged roles)
+    - Row-level security (region teams see only their region's data)
+
+  [Data Contract Layer]
+    - Schema registry for all Bronze tables
+    - dbt schema.yml as contracts for Silver/Gold
+    - Breaking changes require approval + version bump
+
+  [Data Catalog (Purview / DataHub)]
+    - Searchable inventory of all tables with owners, descriptions
+    - Automated lineage from Spark/dbt jobs
+    - Sensitivity labels (PII, confidential, public)
+
+  [Audit Logging]
+    - All reads/writes logged → S3/ADLS audit bucket
+    - Queryable for compliance reporting
+    - Retention: 7 years (or per regulatory requirement)
+
+  [Data Quality Gate]
+    - Great Expectations / dbt tests at Silver → Gold promotion
+    - Failed tables quarantined, not promoted
+
+------------------------------------------------------------------
+
+13.7 SYSTEM DESIGN TRADE-OFF CHEAT SHEET
+------------------------------------------
+  DECISION                 | OPTION A           | OPTION B
+  -------------------------|--------------------|-----------------------
+  Batch vs Streaming       | Batch: simple, high| Stream: complex, low
+                           | latency, cheap     | latency, expensive
+  ETL vs ELT               | ETL: strict control| ELT: flexible, modern
+  Star vs Snowflake        | Star: fast queries | Snowflake: less storage
+  SCD1 vs SCD2             | SCD1: simple, no   | SCD2: history, complex
+                           | history            |
+  Lambda vs Kappa          | Lambda: two code   | Kappa: one code path
+                           | paths, complex     | simpler, stream-only
+  Kafka vs Kinesis         | Kafka: more control| Kinesis: managed, AWS
+  Flink vs Spark Streaming | Flink: lower       | Spark: unified platform
+                           | latency            | easier, Databricks
+  Delta vs Iceberg         | Delta: Databricks  | Iceberg: engine-agnostic
+  COW vs MOR               | COW: fast reads    | MOR: fast writes
+  Broadcast vs Sort-Merge  | Broadcast: no      | Sort-Merge: large+large
+                           | shuffle, small dim |
+
+------------------------------------------------------------------
+
+13.8 COMMON SYSTEM DESIGN INTERVIEW QUESTIONS
+----------------------------------------------
+"Design a data pipeline for [X]" — Always structure as:
+  Ingest → Store (raw) → Process → Store (clean) → Serve
+  Add: orchestration, quality checks, monitoring, failure handling
+
+"How would you scale this pipeline to 10x the data?"
+  - Horizontal scale: more Kafka partitions, more Spark executors
+  - Partition pruning: only process new data
+  - Parallel processing: fan out independent jobs
+  - Cloud auto-scaling: match compute to data volume
+
+"How would you design for exactly-once processing?"
+  - Idempotent writes (MERGE, partition overwrite)
+  - Kafka idempotent producer + consumer offset management
+  - Checkpointing in Spark Structured Streaming
+  - Delta Lake ACID transactions
+
+"How do you handle a pipeline that processes data from 50 source systems?"
+  - Standardize ingestion interface (Fivetran/Airbyte for connectors)
+  - Medallion architecture: each source lands in Bronze independently
+  - Common schema standards and naming conventions
+  - Data catalog to track all sources
+  - Data contracts per source
+
+================================================================
+NEXT: SECTION 14 — PYTHON FOR DATA ENGINEERING
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 14: PYTHON FOR DATA ENGINEERING
+================================================================
+
+14.1 PYTHON FUNDAMENTALS DE INTERVIEWS TEST
+--------------------------------------------
+DE interviews test Python differently than SWE interviews.
+Focus areas:
+  - Data structures (list, dict, set operations)
+  - File I/O and data parsing (CSV, JSON)
+  - Generators and iterators (for large data)
+  - Decorators and context managers
+  - Error handling patterns
+  - OOP basics (classes, inheritance)
+  - Functional patterns (map, filter, reduce, comprehensions)
+  - Common libraries: pandas, pyspark, requests, boto3
+
+------------------------------------------------------------------
+
+14.2 DATA STRUCTURES — KNOW COMPLEXITY
+----------------------------------------
+LIST:
+  Access by index : O(1)
+  Append          : O(1) amortized
+  Insert at index : O(n)
+  Search (in)     : O(n)
+  Remove by value : O(n)
+
+DICT (Hash Map):
+  Get/Set/Delete  : O(1) average
+  Search by key   : O(1)
+  Iteration       : O(n)
+  Use for: lookup tables, counting, grouping
+
+SET:
+  Add/Remove      : O(1)
+  Membership test : O(1)  ← much faster than list for 'in' checks
+  Union/Intersection: O(min(len(a), len(b)))
+  Use for: deduplication, fast membership checks
+
+COMMON PATTERNS:
+  # Counting frequency
+  from collections import Counter
+  counts = Counter(["a", "b", "a", "c", "a"])  # {'a':3, 'b':1, 'c':1}
+
+  # Default dict (no KeyError on missing key)
+  from collections import defaultdict
+  groups = defaultdict(list)
+  for item in data:
+      groups[item['dept']].append(item['name'])
+
+  # OrderedDict (insertion-order preserved — default in Python 3.7+)
+  # deque (fast append/pop from both ends)
+  from collections import deque
+  q = deque(maxlen=1000)  # circular buffer, auto-drops oldest
+
+------------------------------------------------------------------
+
+14.3 GENERATORS — CRITICAL FOR LARGE DATA
+-------------------------------------------
+Generators produce values lazily — one at a time — instead of
+loading everything into memory. Essential for processing large files.
+
+# Bad — loads entire file into memory
+def read_all(path):
+    with open(path) as f:
+        return f.readlines()   # entire file in RAM
+
+# Good — generator, processes one line at a time
+def read_lines(path):
+    with open(path) as f:
+        for line in f:
+            yield line.strip()
+
+# Generator expression (like list comprehension but lazy)
+squares = (x**2 for x in range(10_000_000))  # no memory used yet
+total = sum(squares)  # consumes one at a time
+
+# Pipeline of generators (memory efficient)
+def parse_json_lines(path):
+    for line in read_lines(path):
+        yield json.loads(line)
+
+def filter_active(records):
+    for r in records:
+        if r['status'] == 'active':
+            yield r
+
+# Chain them — only one record in memory at a time
+pipeline = filter_active(parse_json_lines("data.jsonl"))
+for record in pipeline:
+    process(record)
+
+------------------------------------------------------------------
+
+14.4 CONTEXT MANAGERS
+----------------------
+Ensure resources are properly opened and closed, even on error.
+
+# Using with statement
+with open("file.csv") as f:
+    data = f.read()
+# file automatically closed here, even if exception raised
+
+# Custom context manager with class
+class Timer:
+    def __enter__(self):
+        import time
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args):
+        self.elapsed = time.time() - self.start
+        print(f"Elapsed: {self.elapsed:.2f}s")
+
+with Timer() as t:
+    process_data()
+
+# Custom context manager with @contextmanager
+from contextlib import contextmanager
+
+@contextmanager
+def db_connection(conn_string):
+    conn = create_connection(conn_string)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+with db_connection("postgres://...") as conn:
+    conn.execute("INSERT INTO ...")
+
+------------------------------------------------------------------
+
+14.5 DECORATORS — INTERVIEW FAVORITES
+---------------------------------------
+A decorator wraps a function to add behavior without modifying it.
+
+# Basic decorator
+def timer(func):
+    import time
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        print(f"{func.__name__} took {time.time()-start:.2f}s")
+        return result
+    return wrapper
+
+@timer
+def process_data():
+    ...
+
+# Retry decorator (very useful in DE)
+import time
+from functools import wraps
+
+def retry(max_attempts=3, delay=1, backoff=2):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            wait = delay
+            while attempt < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attempt += 1
+                    if attempt == max_attempts:
+                        raise
+                    time.sleep(wait)
+                    wait *= backoff
+        return wrapper
+    return decorator
+
+@retry(max_attempts=3, delay=1, backoff=2)
+def call_api(url):
+    return requests.get(url)
+
+------------------------------------------------------------------
+
+14.6 ERROR HANDLING PATTERNS
+------------------------------
+# Specific exceptions — never catch bare Exception in production
+try:
+    result = risky_operation()
+except FileNotFoundError:
+    logger.error("Input file missing")
+    raise
+except ValueError as e:
+    logger.warning(f"Bad data: {e}")
+    # handle gracefully
+except Exception as e:
+    logger.exception("Unexpected error")  # logs full traceback
+    raise
+
+# Custom exceptions for DE pipelines
+class PipelineError(Exception): pass
+class DataQualityError(PipelineError): pass
+class SchemaValidationError(PipelineError): pass
+
+raise DataQualityError(f"Null count {null_count} exceeds threshold")
+
+------------------------------------------------------------------
+
+14.7 COMMON DE CODING PATTERNS
+--------------------------------
+READ LARGE CSV IN CHUNKS:
+  import pandas as pd
+  for chunk in pd.read_csv("large.csv", chunksize=100_000):
+      process(chunk)
+
+PARSE NESTED JSON:
+  import json
+  with open("data.json") as f:
+      data = json.load(f)
+
+  # Flatten nested structure
+  records = []
+  for order in data['orders']:
+      for item in order['items']:
+          records.append({
+              'order_id': order['id'],
+              'product_id': item['product_id'],
+              'quantity': item['quantity']
+          })
+
+  df = pd.DataFrame(records)
+
+WRITE PARQUET:
+  df.to_parquet("output.parquet", compression="snappy", index=False)
+
+  # With partitioning
+  df.to_parquet("output/", partition_cols=["date", "region"])
+
+MERGE/UPSERT IN PANDAS:
+  merged = pd.merge(target, source, on="id", how="outer", suffixes=("_old","_new"))
+  # Use source value if exists, else keep target
+  merged["value"] = merged["value_new"].combine_first(merged["value_old"])
+
+DEDUPLICATE:
+  df = df.sort_values("updated_at", ascending=False)
+  df = df.drop_duplicates(subset=["id"], keep="first")
+
+GROUPBY + AGGREGATE:
+  result = df.groupby("dept").agg(
+      total_salary=("salary", "sum"),
+      avg_salary=("salary", "mean"),
+      headcount=("id", "count")
+  ).reset_index()
+
+------------------------------------------------------------------
+
+14.8 PYSPARK PATTERNS — DE DAILY WORK
+----------------------------------------
+READ DATA:
+  df = spark.read.format("delta").load("/path/to/delta")
+  df = spark.read.parquet("/path/to/parquet")
+  df = spark.read.csv("/path", header=True, inferSchema=True)
+  df = spark.read.json("/path")
+
+COMMON TRANSFORMATIONS:
+  from pyspark.sql import functions as F
+  from pyspark.sql.window import Window
+
+  # Filter, select, rename
+  df = df.filter(F.col("status") == "active") \
+         .select("id", "name", F.col("salary").alias("pay"))
+
+  # Add computed column
+  df = df.withColumn("tax", F.col("salary") * 0.3)
+
+  # Null handling
+  df = df.fillna({"salary": 0, "dept": "Unknown"})
+  df = df.dropna(subset=["id", "email"])
+
+  # Window function
+  w = Window.partitionBy("dept").orderBy(F.col("salary").desc())
+  df = df.withColumn("rank", F.rank().over(w))
+
+  # Deduplicate
+  df = df.dropDuplicates(["id"])
+
+  # Deduplicate keeping latest
+  w = Window.partitionBy("id").orderBy(F.col("updated_at").desc())
+  df = df.withColumn("rn", F.row_number().over(w)).filter(F.col("rn") == 1)
+
+WRITE DATA:
+  # Overwrite partition
+  df.write.format("delta") \
+    .mode("overwrite") \
+    .option("replaceWhere", "date = '2024-01-15'") \
+    .save("/path/to/delta")
+
+  # Append
+  df.write.format("delta").mode("append").save("/path")
+
+  # Merge (upsert)
+  from delta.tables import DeltaTable
+  target = DeltaTable.forPath(spark, "/path/to/delta")
+  target.alias("t").merge(
+      source.alias("s"),
+      "t.id = s.id"
+  ).whenMatchedUpdateAll() \
+   .whenNotMatchedInsertAll() \
+   .execute()
+
+------------------------------------------------------------------
+
+14.9 COMMON PYTHON INTERVIEW CODING QUESTIONS
+----------------------------------------------
+Q: "Find the top 3 most frequent items in a list."
+A:
+  from collections import Counter
+  data = ["a","b","a","c","b","a","d"]
+  top3 = Counter(data).most_common(3)
+  # [('a',3), ('b',2), ('c',1)]
+
+Q: "Flatten a nested list."
+A:
+  def flatten(lst):
+      for item in lst:
+          if isinstance(item, list):
+              yield from flatten(item)
+          else:
+              yield item
+  list(flatten([1,[2,[3,4]],5]))  # [1,2,3,4,5]
+
+Q: "Group records by a key."
+A:
+  from itertools import groupby
+  data = sorted([{"dept":"A","name":"x"},{"dept":"B","name":"y"},{"dept":"A","name":"z"}],
+                key=lambda r: r["dept"])
+  groups = {k: list(v) for k, v in groupby(data, key=lambda r: r["dept"])}
+
+Q: "Read a large file without loading it all into memory."
+A: Use generator — yield lines one at a time. Or pd.read_csv(chunksize=N).
+
+Q: "Write a function that retries on failure with exponential backoff."
+A: Use the retry decorator pattern from section 14.5.
+
+Q: "What is the difference between a list and a generator?"
+A: List stores all values in memory. Generator produces values lazily,
+   one at a time, using yield. Generators are memory-efficient for
+   large data but can only be iterated once.
+
+================================================================
+NEXT: SECTION 15 — BEHAVIORAL & SCENARIO QUESTIONS
+(Say "next" to continue)
+================================================================
+
+================================================================
+SECTION 15: BEHAVIORAL & SCENARIO QUESTIONS
+================================================================
+
+15.1 THE STAR METHOD — USE FOR EVERY BEHAVIORAL QUESTION
+----------------------------------------------------------
+S — Situation : Set the context (team, project, constraint)
+T — Task      : What was YOUR responsibility?
+A — Action    : What specifically did YOU do? (not "we")
+R — Result    : Quantifiable outcome + what you learned
+
+TIPS:
+  - Keep to 90 seconds max
+  - Use "I" not "we" — interviewer wants YOUR contribution
+  - Always end with a result (metric or outcome)
+  - Have 5-6 STAR stories ready that can be adapted to different questions
+  - Pick stories that show: ownership, technical depth, collaboration,
+    conflict resolution, and learning from failure
+
+------------------------------------------------------------------
+
+15.2 CORE BEHAVIORAL QUESTIONS FOR DATA ENGINEERS
+---------------------------------------------------
+
+"Tell me about yourself."
+  Structure: Current role + key tech stack → one proud project →
+             what you're looking for next.
+  Keep to 2 minutes. End with why THIS company.
+
+"Tell me about a complex pipeline you built."
+  Hit: scale, tech choices (and why), challenges faced,
+       how you made it reliable, what you'd do differently.
+
+"Tell me about a time data quality caused a problem."
+  Ideal answer: Production issue, you detected it, root-caused it,
+  fixed it, AND built prevention (DQ checks, monitoring) to stop it
+  from happening again. Show you move from reactive to proactive.
+
+"Tell me about a time you disagreed with a technical decision."
+  Show: you raised concerns with evidence (not opinion),
+  you listened to the other perspective, you either influenced
+  the decision or executed the agreed approach professionally.
+  Never badmouth past colleagues.
+
+"Tell me about a time you had to learn something quickly."
+  Show: self-sufficiency, learning agility, curiosity.
+  Good DE story: new tool/cloud platform, you read docs, built a
+  POC, delivered on time. Quantify the timeline.
+
+"Tell me about a time a pipeline failed in production."
+  Show: calm under pressure, fast diagnosis, clear communication,
+  fix + prevention. The best answer has an on-call story with
+  timeline, root cause, and postmortem action items.
+
+"Tell me about a time you improved performance."
+  Show: you identified the bottleneck (profiling, Spark UI),
+  applied targeted fix (broadcast join, indexing, partition pruning),
+  measured before/after. Quote the improvement (3x faster, 70% cost reduction).
+
+"Tell me about a time you worked with a difficult stakeholder."
+  Show: empathy, communication, alignment. You understood their real
+  need, found common ground, delivered something that worked for both.
+
+------------------------------------------------------------------
+
+15.3 SENIOR-LEVEL SCENARIO QUESTIONS
+--------------------------------------
+These test judgment, not just knowledge.
+
+SCENARIO: "You join a new team. The pipelines are slow, undocumented,
+           and no one owns them. What do you do?"
+ANSWER:
+  Week 1: Observe and understand before changing anything.
+           Map existing pipelines, find owners, understand SLAs.
+  Week 2: Identify the highest-impact pain points (slowest job,
+           most-failing pipeline, biggest data quality issue).
+  Prioritize by: business impact × effort to fix.
+  Quick wins first to build credibility.
+  Then: add monitoring/alerting, document, refactor with tests.
+  Long-term: propose and implement standards (naming, medallion arch,
+  data contracts).
+
+SCENARIO: "A dashboard is showing wrong numbers. Business is asking
+           what happened. You have 30 minutes. What do you do?"
+ANSWER:
+  Triage first — when did it start? (Check pipeline run times)
+  Check the pipeline that feeds the dashboard:
+    - Did the last run succeed? (Airflow/orchestrator logs)
+    - Row counts normal? (compare today vs yesterday)
+    - Any upstream data issues? (check Bronze layer freshness)
+  Isolate: is it the transformation logic or the source data?
+  Communicate: "We're investigating, likely caused by X, update in 30 min"
+  Fix or roll back, then run root cause analysis + prevention.
+
+SCENARIO: "Your Spark job that takes 2 hours is now taking 8 hours.
+           Nothing changed in the code. What do you investigate?"
+ANSWER:
+  Data volume: has input data grown 4x? Check row counts + file sizes.
+  Spark UI: compare today's stage breakdown vs a good historical run.
+    - New shuffle? Partition skew? Spill to disk?
+  Cluster resources: were executors reduced? Memory decreased?
+  Data layout: new small files? Partition explosion from bad schema change?
+  External dependency: S3 throttling? Slow database read?
+  Recent upstream change: did a source table schema change cause a
+  full file scan instead of partition pruning?
+
+SCENARIO: "A new data source needs to be ingested but the schema
+           changes every week. How do you design for it?"
+ANSWER:
+  Schema-on-read for raw landing (Bronze) — ingest as-is without enforcement.
+  Use schema inference + store schema version alongside data.
+  Track schema changes in a schema registry or metadata table.
+  Apply transformation at Silver layer with explicit mapping.
+  Set up schema change alerts (new column, removed column, type change).
+  Define a schema contract with the source team — breaking changes
+  require advance notice and versioning.
+  Use Delta Lake mergeSchema for additive changes.
+  Test downstream consumers on schema changes before promoting.
+
+SCENARIO: "Your pipeline runs fine in dev but fails in production.
+           How do you debug?"
+ANSWER:
+  Compare environments:
+    - Data volume: prod data 100x larger → OOM, partition issues
+    - Cluster config: memory, cores, number of executors
+    - Permissions: prod S3/ADLS access, secrets, IAM roles
+    - Network: firewall rules, VPC, database connectivity
+    - Data quality: prod data has edge cases dev doesn't have
+      (NULLs, special characters, unexpected values)
+  Run prod config locally with a sample of prod data.
+  Add detailed logging at each stage.
+  Check prod logs for the exact error + stack trace.
+
+SCENARIO: "How do you decide whether to build a new pipeline
+           or improve an existing one?"
+ANSWER:
+  Assess existing pipeline:
+    - What's the root cause of the problem? Technical debt vs wrong design?
+    - Is it maintainable? Does anyone understand it?
+    - What's the cost of incremental improvement vs full rebuild?
+  Build new when: fundamentally wrong architecture, no test coverage,
+  no documentation, team has lost confidence, requires major redesign.
+  Improve existing when: known codebase, targeted issue, low risk.
+  Always: get stakeholder buy-in on timeline and approach.
+  Migrate with parallel running — run old and new, compare outputs,
+  cut over only when outputs match.
+
+------------------------------------------------------------------
+
+15.4 QUESTIONS TO ASK THE INTERVIEWER
+---------------------------------------
+Ask 2-3 at the end — shows curiosity and genuine interest.
+
+ABOUT THE TEAM / ROLE:
+  "What does the data engineering team's current biggest challenge look like?"
+  "What does a typical day look like for a DE on this team?"
+  "How do you measure success for this role in the first 6 months?"
+  "What's the ratio of greenfield work vs maintaining existing pipelines?"
+
+ABOUT THE TECH:
+  "What does the current data stack look like? Any plans to evolve it?"
+  "How do you handle data quality today? Is there a formal process?"
+  "How much technical debt exists in the current pipelines?"
+  "Do engineers own their pipelines end-to-end including on-call?"
+
+ABOUT THE CULTURE:
+  "How does the data engineering team collaborate with data science and analytics?"
+  "How are technical decisions made — top-down or team-driven?"
+  "What does career growth look like for a senior DE here?"
+
+------------------------------------------------------------------
+
+15.5 THINGS THAT KILL SENIOR DE INTERVIEWS
+--------------------------------------------
+DON'T:
+  - Say "I haven't worked with that" without adding "but here's how
+    I'd approach learning it / here's the equivalent I know"
+  - Design without asking clarifying questions
+  - Give only theoretical answers — always tie to real experience
+  - Ignore trade-offs — saying "X is always better" is a red flag
+  - Badmouth past employers/colleagues
+  - Give vague answers to behavioral questions ("we did this as a team")
+
+DO:
+  - Quantify everything (3x faster, 80% cost reduction, 99.9% uptime)
+  - Show ownership (I identified, I designed, I delivered)
+  - Demonstrate depth AND breadth
+  - Admit what you don't know, but show how you'd figure it out
+  - Connect every answer back to business impact
+  - Ask smart questions — shows you've done your homework
+
+------------------------------------------------------------------
+
+15.6 FINAL CHECKLIST — BEFORE YOUR INTERVIEW
+----------------------------------------------
+TECHNICAL:
+  [ ] Can you explain Spark shuffle, skew, and partitioning?
+  [ ] Can you write SQL window functions from memory?
+  [ ] Can you design a CDC pipeline end-to-end?
+  [ ] Do you know SCD Type 2 implementation?
+  [ ] Can you walk through Medallion architecture with trade-offs?
+  [ ] Do you know Delta Lake: ACID, time travel, OPTIMIZE, VACUUM?
+  [ ] Can you explain CAP theorem with real examples?
+  [ ] Can you compare Snowflake / BigQuery / Redshift architectures?
+
+BEHAVIORAL:
+  [ ] Prepare 5-6 STAR stories covering: impact, failure, conflict,
+      learning, collaboration, performance improvement
+  [ ] Practice out loud — not just in your head
+  [ ] Have questions ready for the interviewer
+
+ON THE DAY:
+  [ ] Think out loud — interviewers want to see your reasoning process
+  [ ] For system design: draw before you code (verbal architecture first)
+  [ ] For coding: state your approach before writing
+  [ ] For behavioral: pause, structure, then answer (don't ramble)
+  [ ] Slow down — clarity > speed
+
+================================================================
+  END OF DATA ENGINEERING INTERVIEW PREP GUIDE
+  All 15 Sections Complete
+  File: C:\Users\M003395\Interview\DE_Interview_Prep.txt
+================================================================
